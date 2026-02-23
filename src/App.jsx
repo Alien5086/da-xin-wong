@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 
-// --- 1. 遊戲基礎資料 ---
+// --- 1. 遊戲基礎資料與地圖配置 ---
 const BASE_MONEY = 17200; 
 const BOARD_SQUARES = [
   { id: 0, name: '起點', type: 'START', desc: '經過得$500' },
@@ -71,7 +71,7 @@ const GRID_ORDER = (() => {
 
 const CHILD_AVATARS = ['👦', '👧', '👶', '👼', '👲', '👸', '🤴', '🤓', '🤠', '😎', '👻', '👽'];
 
-// --- 2. Firebase 配置 (優先讀取環境變數) ---
+// --- 2. Firebase 配置管理 ---
 const firebaseConfig = {
   apiKey: "AIzaSyBNN-5xswc1tq_Y5ymWMVGFldZRfpvsVZM",
   authDomain: "da-xin-wong.firebaseapp.com",
@@ -80,6 +80,7 @@ const firebaseConfig = {
   messagingSenderId: "72871979370",
   appId: "1:72871979370:web:97caab1074d5f1e8f9dd13"
 };
+const appId = "da-xin-wong-v1";
 const firebaseConfig = getFirebaseConfig();
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -106,8 +107,9 @@ const getOwnerBgColor = (colorClass) => {
   return map[colorClass] || 'bg-gray-300';
 };
 
-// --- 4. 主程式 ---
+// --- 4. 主程式組件 ---
 export default function App() {
+  // 基礎狀態
   const [appPhase, setAppPhase] = useState('LANDING'); 
   const [user, setUser] = useState(null);
   const [roomId, setRoomId] = useState("");
@@ -115,6 +117,7 @@ export default function App() {
   const [myPlayerIndex, setMyPlayerIndex] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
 
+  // 遊戲雲端資料同步
   const [gameData, setGameData] = useState({
     players: [],
     currentPlayerIdx: 0,
@@ -125,6 +128,7 @@ export default function App() {
     remainingSteps: 0
   });
 
+  // UI 交互狀態
   const [zoom, setZoom] = useState(0.8);
   const [cameraOffset, setCameraOffset] = useState({ x: 0, y: 0 });
   const [manualOffset, setManualOffset] = useState({ x: 0, y: 0 });
@@ -134,9 +138,8 @@ export default function App() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   const MAP_SIZE = 1600;
-  const containerRef = useRef(null);
 
-  // --- 地圖拖曳處理 ---
+  // --- 地圖操作函式 (修復 ReferenceError) ---
   const handlePointerDown = (e) => {
     setIsDragging(true);
     setDragStart({ x: e.clientX - manualOffset.x, y: e.clientY - manualOffset.y });
@@ -154,33 +157,31 @@ export default function App() {
     setIsDragging(false);
   };
 
-  // --- 初始化 Auth (含重試機制) ---
+  // --- 初始化 Firebase Auth ---
   useEffect(() => {
-    const initAuth = async (retries = 5, delay = 1000) => {
+    const initAuth = async (retries = 3) => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
           await signInAnonymously(auth);
         }
-        console.log("Auth Success");
         setErrorMsg(null);
       } catch (e) {
-        console.error(`Auth Fail (剩餘重試次數: ${retries}):`, e);
+        console.error("Auth Error:", e);
         if (retries > 0) {
-          setTimeout(() => initAuth(retries - 1, delay * 2), delay);
+          setTimeout(() => initAuth(retries - 1), 1000);
         } else {
-          setErrorMsg("網路連線失敗，請檢查金鑰設定或稍後再試。");
+          setErrorMsg("連線至雲端伺服器失敗，請檢查網路。");
         }
       }
     };
-    
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
   }, []);
 
-  // --- 同步雲端資料 ---
+  // --- 監聽雲端資料 ---
   useEffect(() => {
     if (!user || !roomId || appPhase !== 'GAME') return;
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
@@ -189,12 +190,12 @@ export default function App() {
         setGameData(docSnap.data());
       }
     }, (err) => {
-      console.error("Firestore Sync Error:", err);
+      console.error("Sync Error:", err);
     });
     return () => unsubscribe();
   }, [user, roomId, appPhase]);
 
-  // --- 相機對準邏輯 ---
+  // --- 相機追蹤邏輯 ---
   const displayZoom = isFullMapMode ? Math.min(viewportSize.w / MAP_SIZE, viewportSize.h / MAP_SIZE) * 0.7 : zoom;
   
   useEffect(() => {
@@ -221,21 +222,21 @@ export default function App() {
     });
   }, [gameData.currentPlayerIdx, isFullMapMode, displayZoom, viewportSize, appPhase]);
 
-  // --- 遊戲操作 ---
+  // --- 房間操作 ---
   const createRoom = async (count) => {
     if (!user) return;
-    try {
-      const id = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const players = Array.from({ length: count }).map((_, i) => ({
-        id: i,
-        name: `玩家 ${i + 1}`,
-        icon: CHILD_AVATARS[i],
-        color: ['bg-blue-500', 'bg-red-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'][i],
-        pos: 0,
-        money: BASE_MONEY,
-        uid: i === 0 ? user.uid : null
-      }));
+    const id = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const players = Array.from({ length: count }).map((_, i) => ({
+      id: i,
+      name: `玩家 ${i + 1}`,
+      icon: CHILD_AVATARS[i],
+      color: ['bg-blue-500', 'bg-red-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'][i],
+      pos: 0,
+      money: BASE_MONEY,
+      uid: i === 0 ? user.uid : null
+    }));
 
+    try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
         players,
         currentPlayerIdx: 0,
@@ -248,13 +249,12 @@ export default function App() {
       setMyPlayerIndex(0);
       setAppPhase('GAME');
     } catch (e) {
-      console.error("Create Room Error:", e);
-      setErrorMsg("建立房間失敗，請確認資料庫權限設定。");
+      setErrorMsg("建立房間失敗，請確認 Firebase 設定。");
     }
   };
 
   const joinRoom = async (id) => {
-    if (!user) return;
+    if (!user || !id) return;
     try {
       const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id);
       const snap = await getDoc(roomRef);
@@ -265,33 +265,31 @@ export default function App() {
       const data = snap.data();
       const slot = data.players.findIndex(p => p.uid === null);
       if (slot === -1) {
-        setErrorMsg("該房間已滿！");
+        setErrorMsg("房間已滿！");
         return;
       }
-
       data.players[slot].uid = user.uid;
       await updateDoc(roomRef, { players: data.players });
       setRoomId(id);
       setMyPlayerIndex(slot);
       setAppPhase('GAME');
     } catch (e) {
-      console.error("Join Room Error:", e);
       setErrorMsg("加入房間失敗。");
     }
   };
 
+  // --- 渲染 Landing 頁面 ---
   if (appPhase === 'LANDING') {
     return (
       <div className="h-screen w-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
-        <Smartphone size={80} className="text-blue-400 mb-4 animate-pulse" />
+        <Smartphone size={80} className="text-blue-400 mb-4 animate-bounce" />
         <h1 className="text-4xl font-black mb-2">大信翁多人連線</h1>
-        <p className="text-slate-400 mb-8 font-bold">同步連線模式 v2.1</p>
+        <p className="text-slate-400 mb-8 font-bold text-sm">手機遙控・即時同步</p>
         
         {errorMsg && (
-          <div className="mb-6 bg-red-500/20 border border-red-500/50 p-4 rounded-xl text-red-200 flex items-center gap-3 animate-fade-in">
+          <div className="mb-6 bg-red-500/20 border border-red-500/50 p-4 rounded-xl text-red-200 flex items-center gap-3">
             <AlertCircle size={20} />
             <span className="text-sm font-bold">{errorMsg}</span>
-            <button onClick={() => setErrorMsg(null)} className="ml-2 hover:text-white"><LogOut size={16}/></button>
           </div>
         )}
 
@@ -301,12 +299,12 @@ export default function App() {
             onClick={() => createRoom(4)} 
             className={`py-4 rounded-2xl font-black text-xl shadow-xl transition active:scale-95 ${!user ? 'bg-slate-700 opacity-50' : 'bg-blue-600 hover:bg-blue-500'}`}
           >
-            {user ? "我要開房間" : "正在登入雲端..."}
+            {user ? "我要開房間" : "正在建立連線..."}
           </button>
           
           <div className="relative flex items-center py-2">
             <div className="flex-grow border-t border-slate-700"></div>
-            <span className="px-3 text-slate-500 text-sm font-bold uppercase">或</span>
+            <span className="px-3 text-slate-500 text-xs font-bold uppercase">或</span>
             <div className="flex-grow border-t border-slate-700"></div>
           </div>
 
@@ -327,10 +325,11 @@ export default function App() {
     );
   }
 
+  // --- 渲染遊戲頁面 ---
   return (
     <div className="h-screen w-screen bg-slate-950 overflow-hidden relative touch-none">
       {/* 頂部資訊欄 */}
-      <div className="bg-white/90 backdrop-blur-md p-2 flex justify-between items-center z-50 relative border-b-2 border-slate-800">
+      <div className="bg-white/95 backdrop-blur-md p-2 flex justify-between items-center z-50 relative border-b-2 border-slate-800">
         <div className="flex items-center gap-2">
           <div className="font-black px-3 py-1 bg-slate-900 text-white rounded-lg shadow-sm">房號: {roomId}</div>
         </div>
@@ -370,7 +369,7 @@ export default function App() {
               const owner = gameData.players.find(p => gameData.properties?.[idx] === p.id);
               const playersHere = gameData.players.filter(p => p.pos === idx);
               return (
-                <div key={idx} className={`${owner ? getOwnerBgColor(owner.color) : 'bg-white'} rounded-lg relative border-2 border-slate-400 transition-colors`} style={{ gridRow: row, gridColumn: col }}>
+                <div key={idx} className={`${owner ? getOwnerBgColor(owner.color) : 'bg-white'} rounded-lg relative border-2 border-slate-400`} style={{ gridRow: row, gridColumn: col }}>
                   <div className="flex flex-col items-center justify-center h-full text-[10px] font-black leading-tight text-center p-0.5">
                     <span className="truncate w-full">{sq.name}</span>
                     {sq.price && <div className="text-blue-700 font-black">${sq.price}</div>}
@@ -379,7 +378,7 @@ export default function App() {
                     {playersHere.map((p, pIdx) => (
                       <div 
                         key={p.id} 
-                        className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xl shadow-xl transition-all duration-300 ${p.color} ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400 ring-offset-1' : 'z-10 opacity-90'}`}
+                        className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xl shadow-xl transition-all duration-300 ${p.color} ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400' : 'z-10 opacity-90'}`}
                         style={{ transform: `translate(${pIdx * 4}px, ${pIdx * 4}px)` }}
                       >
                         {p.icon}
@@ -394,37 +393,29 @@ export default function App() {
       </div>
 
       {/* 我的狀態欄 (左下) */}
-      <div className="fixed bottom-6 left-6 bg-slate-900/90 backdrop-blur-lg text-white p-4 rounded-3xl border border-white/20 flex items-center gap-4 z-50 shadow-2xl animate-fade-in-up">
+      <div className="fixed bottom-6 left-6 bg-slate-900/90 backdrop-blur-lg text-white p-4 rounded-3xl border border-white/20 flex items-center gap-4 z-50 shadow-2xl">
         <div className={`w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-inner ${gameData.players[myPlayerIndex]?.color || 'bg-slate-700'}`}>
           {gameData.players[myPlayerIndex]?.icon || '❓'}
         </div>
         <div>
-          <div className="text-[10px] font-black text-blue-400 tracking-widest uppercase mb-0.5">我的資產</div>
+          <div className="text-[10px] font-black text-blue-400 tracking-widest uppercase mb-0.5">我的錢包</div>
           <div className="text-2xl font-black tabular-nums">${gameData.players[myPlayerIndex]?.money || 0}</div>
         </div>
       </div>
 
-      {/* 控制按鈕：僅在輪到自己且狀態閒置時出現 */}
+      {/* 控制按鈕：輪到自己且狀態閒置時出現 */}
       {gameData.currentPlayerIdx === myPlayerIndex && gameData.gameState === 'IDLE' && (
-        <button className="fixed bottom-6 right-6 w-28 h-28 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-2xl shadow-[0_0_50px_rgba(37,99,235,0.5)] animate-bounce z-50 border-8 border-white active:scale-90 transition-transform flex items-center justify-center text-center leading-tight">
-          擲<br/>骰
+        <button className="fixed bottom-6 right-6 w-28 h-28 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-2xl shadow-[0_0_50px_rgba(37,99,235,0.5)] animate-bounce z-50 border-8 border-white active:scale-90 transition-transform flex items-center justify-center text-center">
+          擲骰
         </button>
       )}
 
       {/* 全螢幕錯誤提示 */}
       {errorMsg && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-red-600 text-white px-6 py-3 rounded-full font-bold shadow-2xl animate-bounce flex items-center gap-2">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-red-600 text-white px-6 py-3 rounded-full font-bold shadow-2xl animate-pulse flex items-center gap-2">
           <AlertCircle size={20} /> {errorMsg}
         </div>
       )}
-
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes fade-in-up {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in-up { animation: fade-in-up 0.5s ease-out; }
-      `}} />
     </div>
   );
 }
