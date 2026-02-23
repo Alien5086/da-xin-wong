@@ -106,11 +106,18 @@ const GRID_ORDER = (() => {
 const CHILD_AVATARS = ['👦', '👧', '👶', '👼', '👲', '👸', '🤴', '🤓', '🤠', '😎', '👻', '👽'];
 
 // --- 2. Firebase 設定 ---
-const firebaseConfig = JSON.parse(__firebase_config);
+const firebaseConfig = {
+  apiKey: "AIzaSyBNN-5xswc1tq_Y5ymWMVGFldZRfpvsVZM",
+  authDomain: "da-xin-wong.firebaseapp.com",
+  projectId: "da-xin-wong",
+  storageBucket: "da-xin-wong.firebasestorage.app",
+  messagingSenderId: "72871979370",
+  appId: "1:72871979370:web:97caab1074d5f1e8f9dd13"
+};
+const appId = "da-xin-wong-v1"; 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
 
 // --- 3. 輔助工具 ---
 const shuffle = (array) => [...array].sort(() => Math.random() - 0.5);
