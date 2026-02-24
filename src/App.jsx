@@ -321,8 +321,9 @@ export default function App() {
       uid: i === 0 ? user.uid : null 
     }));
     try {
+      // 🌟 確保初始建立房間時就有給予 diceVals，防崩潰重點
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
-        players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0
+        players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0, diceVals: [1, 1]
       });
       setRoomId(id); setIsHost(true); setMyPlayerIndex(0); setAppPhase('GAME'); setLocalTimeLeft(setupTimeLimit);
     } catch (e) { setErrorMsg("建立失敗，請確認 Firebase 設定。"); }
@@ -340,6 +341,7 @@ export default function App() {
       
       data.players[slot].uid = user.uid;
       data.players[slot].icon = setupAvatar;
+      data.players[slot].inJail = false; 
       
       await updateDoc(roomRef, { players: data.players });
       setMyPlayerIndex(slot); setAppPhase('GAME');
@@ -399,7 +401,8 @@ export default function App() {
       }, 100);
       return () => clearInterval(interval);
     } else {
-      setDisplayDice(gameData.diceVals);
+      // 🌟 安全取值防崩潰
+      setDisplayDice(gameData.diceVals || [1, 1]);
     }
   }, [gameData.gameState, gameData.diceVals]);
 
@@ -605,6 +608,8 @@ export default function App() {
      try {
         const player = gameData.players[myPlayerIndex];
         const sq = BOARD_SQUARES[sqId];
+        if (!sq) return;
+        
         const isHighTrust = player.trust > 10;
         const sellPrice = isHighTrust ? sq.price : Math.floor(sq.price / 2);
 
@@ -834,6 +839,10 @@ export default function App() {
   const canBuy = myMoney >= reqMoney && myTrust >= reqTrust;
 
   const myProperties = Object.keys(gameData.properties || {}).filter(sqId => gameData.properties[sqId] === myPlayerIndex);
+  
+  // 🌟 絕對防護的骰子狀態
+  const safeDice = displayDice || [1, 1];
+  const serverDice = gameData.diceVals || [1, 1];
 
   return (
     <div className="h-screen w-screen bg-[#0a192f] overflow-hidden relative touch-none select-none font-sans">
@@ -907,6 +916,7 @@ export default function App() {
                         <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-2">
                            {myProperties.map(sqId => {
                                const sq = BOARD_SQUARES[sqId];
+                               if (!sq) return null;
                                const sellPrice = myPlayer.trust >= 10 ? sq.price : Math.floor(sq.price / 2);
                                return (
                                    <div key={sqId} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-200">
@@ -940,21 +950,21 @@ export default function App() {
         </button>
       </div>
 
-      {/* 🌟 全螢幕真實骰子滾動動畫 */}
+      {/* 🌟 全螢幕真實骰子滾動動畫 (修復崩潰版) */}
       {gameData.gameState === 'ROLLING' && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-md">
           <div className="text-white font-black text-4xl mb-10 tracking-widest animate-pulse drop-shadow-lg">擲骰子中...</div>
           <div className="flex gap-10">
-            <DiceIcon value={displayDice[0]} className="w-40 h-40 text-white animate-bounce drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0s' }} />
-            <DiceIcon value={displayDice[1]} className="w-40 h-40 text-white animate-bounce drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0.1s' }} />
+            <DiceIcon value={safeDice[0]} className="w-40 h-40 text-white animate-bounce drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0s' }} />
+            <DiceIcon value={safeDice[1]} className="w-40 h-40 text-white animate-bounce drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0.1s' }} />
           </div>
         </div>
       )}
 
       {/* 顯示骰出的點數 */}
-      {(gameData.gameState === 'MOVING' || gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && gameData.diceVals && (
+      {(gameData.gameState === 'MOVING' || gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-white/95 p-3 px-8 rounded-full shadow-2xl font-black text-2xl flex items-center gap-4 z-50 border-4 border-blue-500">
-          🎲 {gameData.diceVals[0]} + {gameData.diceVals[1]} = <span className="text-blue-600 text-3xl">{gameData.diceVals[0] + gameData.diceVals[1]}</span> 步
+          🎲 {serverDice[0]} + {serverDice[1]} = <span className="text-blue-600 text-3xl">{serverDice[0] + serverDice[1]}</span> 步
         </div>
       )}
 
@@ -1047,7 +1057,7 @@ export default function App() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2">
-                  {gameData.actionMessage && <div className="bg-white/95 text-slate-800 font-bold px-6 py-3 rounded-2xl shadow-lg border-4 border-slate-300 text-lg mb-2 text-center whitespace-pre-line">{gameData.actionMessage}</div>}
+                  {gameData.actionMessage && <div className="bg-white/95 text-slate-800 font-bold px-6 py-3 rounded-2xl shadow-lg border-4 border-slate-300 text-lg mb-2 text-center whitespace-pre-line">{(gameData.actionMessage || '')}</div>}
                   <button onClick={handleRollDice} className="px-12 py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-4xl shadow-[0_10px_0_0_#1e3a8a,0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_#1e3a8a,0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-4 border-4 border-white animate-bounce">
                     <Dice5 size={40} /> 擲骰子
                   </button>
@@ -1058,7 +1068,7 @@ export default function App() {
 
           {(gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && (
             <div className="bg-white p-6 rounded-3xl shadow-2xl flex flex-col gap-4 border-4 border-slate-800 min-w-[320px]">
-              {gameData.actionMessage.split('\n').map((line, i) => (
+              {(gameData.actionMessage || '').split('\n').map((line, i) => (
                 <div key={i} className="font-black text-center text-slate-800 text-xl leading-snug">{line}</div>
               ))}
               
