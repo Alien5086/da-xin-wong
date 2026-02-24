@@ -6,7 +6,8 @@ import {
   Coins, Map, LocateFixed, Volume2, VolumeX, 
   Music, Users, Play, ChevronRight, Store, 
   Trophy, Timer, Gift, PlusCircle, MinusCircle, LogOut,
-  Target, Info, Building2, QrCode, Link2, Copy, Smartphone, Star, Clock, Users as UsersIcon
+  Target, Info, Building2, QrCode, Link2, Copy, Smartphone, Star, Clock, Users as UsersIcon,
+  Briefcase
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -15,48 +16,65 @@ import {
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 
-// --- 1. 遊戲基礎資料 ---
+// --- 1. 遊戲基礎資料與卡牌庫 ---
 const BASE_MONEY = 17200; 
-const BASE_TRUST = 20;
+const BASE_TRUST = 10; // 規則：初始信用點數10點
+
+const GOOD_CARDS = [
+  { desc: '扶老奶奶過馬路', effectM: 200, effectT: 3 },
+  { desc: '考試考一百分', effectM: 500, effectT: 2 },
+  { desc: '拾金不昧', effectM: 300, effectT: 5 },
+  { desc: '當選模範生', effectM: 1000, effectT: 5 },
+  { desc: '主動打掃教室', effectM: 100, effectT: 2 }
+];
+
+const BAD_CARDS = [
+  { desc: '遺失錢包', effectM: -300, effectT: -2 },
+  { desc: '隨地亂丟垃圾', effectM: -200, effectT: -3 },
+  { desc: '打破鄰居玻璃', effectM: -400, effectT: -2 },
+  { desc: '上課遲到', effectM: -100, effectT: -2 },
+  { desc: '對同學說謊被抓到', effectM: 0, effectT: -5 },
+  { desc: '做壞事進靜心房', effectM: 0, effectT: 0, goToJail: true }
+];
 
 const BOARD_SQUARES = [
   { id: 0, name: '起點', type: 'START', desc: '經過得$500' },
   { id: 1, name: '冰店', type: 'PROPERTY', price: 400, reqTrust: 12, color: 'bg-blue-400' },
-  { id: 2, name: '虛卡', type: 'CHANCE_BAD', desc: '遺失錢包', effectM: -300, effectT: -2, color: 'bg-red-200' },
+  { id: 2, name: '虛卡', type: 'CHANCE_BAD', color: 'bg-red-200' },
   { id: 3, name: '飲料店', type: 'PROPERTY', price: 500, reqTrust: 12, color: 'bg-blue-400' },
   { id: 4, name: '班費', type: 'TAX', amount: 200, color: 'bg-gray-300' },
   { id: 5, name: '火車站', type: 'PROPERTY', price: 1800, reqTrust: 15, color: 'bg-gray-600' },
   { id: 6, name: '小吃店', type: 'PROPERTY', price: 400, reqTrust: 12, color: 'bg-orange-400' },
-  { id: 7, name: '實卡', type: 'CHANCE_GOOD', desc: '扶老奶奶過馬路', effectM: 200, effectT: 3, color: 'bg-green-200' },
+  { id: 7, name: '實卡', type: 'CHANCE_GOOD', color: 'bg-green-200' },
   { id: 8, name: '麵包店', type: 'PROPERTY', price: 500, reqTrust: 12, color: 'bg-orange-400' },
   { id: 9, name: '便利商店', type: 'PROPERTY', price: 600, reqTrust: 12, color: 'bg-orange-400' },
   { id: 10, name: '靜心房', type: 'JAIL', desc: '反省懺悔', color: 'bg-slate-300' },
   { id: 11, name: '服飾店', type: 'PROPERTY', price: 700, reqTrust: 12, color: 'bg-pink-400' },
   { id: 12, name: '超級市場', type: 'PROPERTY', price: 700, reqTrust: 12, color: 'bg-pink-400' },
-  { id: 13, name: '虛卡', type: 'CHANCE_BAD', desc: '隨地亂丟垃圾', effectM: -200, effectT: -3, color: 'bg-red-200' },
+  { id: 13, name: '虛卡', type: 'CHANCE_BAD', color: 'bg-red-200' },
   { id: 14, name: '鞋店', type: 'PROPERTY', price: 700, reqTrust: 0, color: 'bg-pink-400' },
   { id: 15, name: '書局', type: 'PROPERTY', price: 800, reqTrust: 0, color: 'bg-yellow-400' },
   { id: 16, name: '補習班', type: 'PROPERTY', price: 900, reqTrust: 12, color: 'bg-yellow-400' },
-  { id: 17, name: '實卡', type: 'CHANCE_GOOD', desc: '考試考一百分', effectM: 500, effectT: 2, color: 'bg-green-200' },
+  { id: 17, name: '實卡', type: 'CHANCE_GOOD', color: 'bg-green-200' },
   { id: 18, name: '才藝班', type: 'PROPERTY', price: 900, reqTrust: 0, color: 'bg-yellow-400' },
   { id: 19, name: '網咖', type: 'PROPERTY', price: 1600, reqTrust: 10, color: 'bg-purple-500' },
   { id: 20, name: '道育班', type: 'FREE_PARKING', desc: '平安無事', color: 'bg-blue-200' },
   { id: 21, name: '遊樂場', type: 'PROPERTY', price: 1100, reqTrust: 12, color: 'bg-teal-400' },
   { id: 22, name: '博物館', type: 'PROPERTY', price: 1600, reqTrust: 12, color: 'bg-teal-400' },
   { id: 23, name: '公園', type: 'PROPERTY', price: 1000, reqTrust: 12, color: 'bg-teal-400' },
-  { id: 24, name: '虛卡', type: 'CHANCE_BAD', desc: '打破鄰居玻璃', effectM: -400, effectT: -2, color: 'bg-red-200' },
+  { id: 24, name: '虛卡', type: 'CHANCE_BAD', color: 'bg-red-200' },
   { id: 25, name: '美髮店', type: 'PROPERTY', price: 600, reqTrust: 0, color: 'bg-indigo-400' },
-  { id: 26, name: '實卡', type: 'CHANCE_GOOD', desc: '拾金不昧', effectM: 300, effectT: 5, color: 'bg-green-200' },
+  { id: 26, name: '實卡', type: 'CHANCE_GOOD', color: 'bg-green-200' },
   { id: 27, name: '電力公司', type: 'PROPERTY', price: 2000, reqTrust: 15, color: 'bg-gray-600' },
   { id: 28, name: '玩具店', type: 'PROPERTY', price: 700, reqTrust: 0, color: 'bg-indigo-400' },
   { id: 29, name: '图書館', type: 'PROPERTY', price: 1500, reqTrust: 12, color: 'bg-indigo-400' },
   { id: 30, name: '進入靜心房', type: 'GO_TO_JAIL', desc: '直接入獄', color: 'bg-slate-400' },
-  { id: 31, name: '虛卡', type: 'CHANCE_BAD', desc: '上課遲到', effectM: -100, effectT: -2, color: 'bg-red-200' },
+  { id: 31, name: '虛卡', type: 'CHANCE_BAD', color: 'bg-red-200' },
   { id: 32, name: '學校', type: 'PROPERTY', price: 1800, reqTrust: 15, color: 'bg-green-400' },
   { id: 33, name: '植物園', type: 'PROPERTY', price: 1400, reqTrust: 12, color: 'bg-green-400' },
   { id: 34, name: '美術館', type: 'PROPERTY', price: 1500, reqTrust: 12, color: 'bg-green-400' },
   { id: 35, name: '科博館', type: 'PROPERTY', price: 1600, reqTrust: 12, color: 'bg-green-400' },
-  { id: 36, name: '實卡', type: 'CHANCE_GOOD', desc: '當選模範生', effectM: 1000, effectT: 5, color: 'bg-green-200' },
+  { id: 36, name: '實卡', type: 'CHANCE_GOOD', color: 'bg-green-200' },
   { id: 37, name: '孔廟', type: 'PROPERTY', price: 1900, reqTrust: 15, color: 'bg-red-400' },
   { id: 38, name: '學費', type: 'TAX', amount: 500, color: 'bg-gray-300' },
   { id: 39, name: '自來水廠', type: 'PROPERTY', price: 2000, reqTrust: 15, color: 'bg-gray-600' },
@@ -101,8 +119,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
 
-
-// --- 3. 輔助函數 ---
+// --- 輔助函數 ---
 const formatTime = (seconds) => {
   if (seconds === -1) return "不限時";
   const m = Math.floor(seconds / 60);
@@ -119,7 +136,13 @@ const getOwnerBgColor = (colorClass) => {
   return map[colorClass] || 'bg-gray-300';
 };
 
-// --- 4. 主程式組件 ---
+const DiceIcon = ({ value, ...props }) => {
+  const icons = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
+  const Icon = icons[(value || 1) - 1] || Dice1;
+  return <Icon {...props} />;
+};
+
+// --- 主程式組件 ---
 export default function App() {
   const [appPhase, setAppPhase] = useState('LANDING'); 
   
@@ -137,8 +160,12 @@ export default function App() {
   const [gameData, setGameData] = useState({
     players: [], currentPlayerIdx: 0, properties: {},
     gameState: 'IDLE', timeLeft: 0, diceVals: [1, 1], actionMessage: '',
-    remainingSteps: 0 // 新增：用於步數倒數與動畫
+    remainingSteps: 0 
   });
+
+  const [displayDice, setDisplayDice] = useState([1, 1]);
+  const [showAssetManager, setShowAssetManager] = useState(false); // 資產管理面板
+  const [localTimeLeft, setLocalTimeLeft] = useState(0); // 本地倒數計時
 
   const [zoom, setZoom] = useState(0.8);
   const [cameraOffset, setCameraOffset] = useState({ x: 0, y: 0 });
@@ -220,9 +247,33 @@ export default function App() {
     if (!user || !roomId || appPhase !== 'GAME') return;
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
     return onSnapshot(roomRef, (docSnap) => {
-      if (docSnap.exists()) setGameData(docSnap.data());
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setGameData(data);
+        if (data.timeLeft !== -1 && localTimeLeft === 0) {
+            setLocalTimeLeft(data.timeLeft);
+        }
+      }
     });
   }, [user, roomId, appPhase]);
+
+  // --- 本地遊戲倒數計時器 ---
+  useEffect(() => {
+    if (appPhase !== 'GAME' || gameData.timeLeft === -1 || gameData.gameState === 'GAME_OVER') return;
+    const timer = setInterval(() => {
+        setLocalTimeLeft(prev => {
+            if (prev <= 1) {
+                if (isHost && gameData.gameState !== 'GAME_OVER') {
+                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), { gameState: 'GAME_OVER' });
+                }
+                return 0;
+            }
+            return prev - 1;
+        });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [appPhase, gameData.timeLeft, gameData.gameState, isHost, roomId]);
+
 
   // --- 對焦與視角跟隨 ---
   const focusOnCurrentPlayer = useCallback(() => {
@@ -266,14 +317,14 @@ export default function App() {
       icon: i === 0 ? setupAvatar : '⏳', 
       color: ['bg-blue-500', 'bg-red-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'][i],
       pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
-      inJail: false, // 🌟 新增：入獄狀態追蹤
+      inJail: false, jailRoundsLeft: 0, isBankrupt: false,
       uid: i === 0 ? user.uid : null 
     }));
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
         players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0
       });
-      setRoomId(id); setIsHost(true); setMyPlayerIndex(0); setAppPhase('GAME');
+      setRoomId(id); setIsHost(true); setMyPlayerIndex(0); setAppPhase('GAME'); setLocalTimeLeft(setupTimeLimit);
     } catch (e) { setErrorMsg("建立失敗，請確認 Firebase 設定。"); }
   };
 
@@ -289,10 +340,10 @@ export default function App() {
       
       data.players[slot].uid = user.uid;
       data.players[slot].icon = setupAvatar;
-      data.players[slot].inJail = false; // 確保有此欄位
       
       await updateDoc(roomRef, { players: data.players });
       setMyPlayerIndex(slot); setAppPhase('GAME');
+      if (data.timeLeft !== -1) setLocalTimeLeft(data.timeLeft);
     } catch (e) { setErrorMsg("加入失敗。"); }
   };
 
@@ -300,7 +351,29 @@ export default function App() {
   // 🎲 核心遊戲邏輯：動畫與事件處理
   // ==========================================
 
-  // 1. 擲骰子並進入「移動狀態」
+  const checkBankruptcy = (players) => {
+      let changed = false;
+      const newPlayers = players.map(p => {
+          if (!p.isBankrupt && (p.money < 0 || p.trust <= 0)) {
+              changed = true;
+              return { ...p, isBankrupt: true };
+          }
+          return p;
+      });
+      return { changed, newPlayers };
+  };
+
+  const clearBankruptProperties = (props, bankruptPlayerIds) => {
+      const newProps = { ...props };
+      Object.keys(newProps).forEach(sqId => {
+          if (bankruptPlayerIds.includes(newProps[sqId])) {
+              delete newProps[sqId];
+          }
+      });
+      return newProps;
+  };
+
+  // 1. 擲骰子
   const handleRollDice = async () => {
     if (gameData.currentPlayerIdx !== myPlayerIndex) return;
 
@@ -312,30 +385,55 @@ export default function App() {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
         diceVals: [d1, d2],
         remainingSteps: steps,
-        gameState: 'MOVING', // 🌟 進入「一步一步移動」的動畫狀態
+        gameState: 'ROLLING', 
         actionMessage: ''
       });
     } catch (e) { console.error("Roll dice error", e); }
   };
 
-  // 🌟 2. 移動動畫引擎 (使用 useEffect 控制分步寫入 Firebase)
+  // 動畫骰子切換
+  useEffect(() => {
+    if (gameData.gameState === 'ROLLING') {
+      const interval = setInterval(() => {
+        setDisplayDice([Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1]);
+      }, 100);
+      return () => clearInterval(interval);
+    } else {
+      setDisplayDice(gameData.diceVals);
+    }
+  }, [gameData.gameState, gameData.diceVals]);
+
+  // 動畫結束，開始移動
+  useEffect(() => {
+    if (appPhase !== 'GAME') return;
+    if (gameData.gameState === 'ROLLING' && gameData.currentPlayerIdx === myPlayerIndex) {
+      const timer = setTimeout(async () => {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+          gameState: 'MOVING'
+        });
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [gameData.gameState, gameData.currentPlayerIdx, myPlayerIndex, roomId]);
+
+  // 3. 移動動畫引擎
   useEffect(() => {
     if (appPhase !== 'GAME') return;
     if (gameData.gameState !== 'MOVING') return;
-    // 只有「當前行動的玩家」負責發送移動訊號，其他玩家被動接收畫面更新
     if (gameData.currentPlayerIdx !== myPlayerIndex) return;
 
     const moveTimer = setTimeout(async () => {
       try {
         const player = gameData.players[myPlayerIndex];
         
-        // 還有步數，繼續往前走一格
         if (gameData.remainingSteps > 0) {
-          let newPos = (player.pos + 1) % 40;
+          const targetPos = player.pos + 1;
+          let newPos = targetPos % 40;
           let newMoney = player.money;
           let msg = gameData.actionMessage || '';
           
-          if (newPos === 0) {
+          // 經過起點領 $500，停在起點不領錢 (在 handleLandOnSquare 處理)
+          if (newPos === 0 && gameData.remainingSteps > 1) {
             newMoney += 500;
             msg = '經過起點，獲得 $500！\n';
           }
@@ -345,23 +443,21 @@ export default function App() {
 
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
             players: newPlayers,
-            remainingSteps: gameData.remainingSteps - 1, // 步數減 1
+            remainingSteps: gameData.remainingSteps - 1,
             actionMessage: msg
           });
-        } 
-        // 步數走完，觸發該格子的事件
-        else {
+        } else {
           await handleLandOnSquare();
         }
       } catch (e) {
         console.error("Move step error", e);
       }
-    }, 350); // 🌟 控制每步動畫的速度 (350毫秒)
+    }, 350);
 
     return () => clearTimeout(moveTimer);
   }, [gameData.gameState, gameData.remainingSteps, gameData.currentPlayerIdx, myPlayerIndex]);
 
-  // 3. 觸發降落格子的事件
+  // 4. 觸發降落格子的事件
   const handleLandOnSquare = async () => {
     const player = gameData.players[myPlayerIndex];
     const sq = BOARD_SQUARES[player.pos];
@@ -369,32 +465,52 @@ export default function App() {
     let msg = gameData.actionMessage || '';
     const newPlayers = [...gameData.players];
 
-    if (sq.type === 'TAX') {
+    if (sq.type === 'START') {
+      msg += `停在起點，無法領取零用錢。`;
+      nextState = 'END_TURN';
+    } else if (sq.type === 'TAX') {
       newPlayers[myPlayerIndex].money -= sq.amount;
       msg += `繳納${sq.name} $${sq.amount}。`;
       nextState = 'END_TURN';
     } else if (sq.type === 'CHANCE_GOOD' || sq.type === 'CHANCE_BAD') {
-      newPlayers[myPlayerIndex].money += sq.effectM;
-      newPlayers[myPlayerIndex].trust += sq.effectT;
-      msg += `抽中卡片：${sq.desc}！\n金錢 ${sq.effectM > 0 ? '+'+sq.effectM : sq.effectM}，信用 ${sq.effectT > 0 ? '+'+sq.effectT : sq.effectT}。`;
+      const cardPool = sq.type === 'CHANCE_GOOD' ? GOOD_CARDS : BAD_CARDS;
+      const card = cardPool[Math.floor(Math.random() * cardPool.length)];
+      
+      msg += `抽中卡片：【${card.desc}】\n`;
+      if (card.goToJail) {
+         newPlayers[myPlayerIndex].pos = 10;
+         newPlayers[myPlayerIndex].inJail = true;
+         newPlayers[myPlayerIndex].jailRoundsLeft = -1; // -1 表示剛進去，需要擲杯
+         msg += `直接被送進靜心房反省！`;
+      } else {
+         newPlayers[myPlayerIndex].money += card.effectM;
+         newPlayers[myPlayerIndex].trust += card.effectT;
+         msg += `金錢 ${card.effectM > 0 ? '+'+card.effectM : card.effectM}，信用 ${card.effectT > 0 ? '+'+card.effectT : card.effectT}。`;
+      }
       nextState = 'END_TURN';
-    } else if (sq.type === 'GO_TO_JAIL' || sq.id === 30) {
+    } else if (sq.type === 'GO_TO_JAIL' || sq.id === 30 || sq.type === 'JAIL' || sq.id === 10) {
       newPlayers[myPlayerIndex].pos = 10;
-      newPlayers[myPlayerIndex].inJail = true; // 🌟 標記入獄
-      msg += `被抓進靜心房了！(下次行動需擲出聖杯才能離開)`;
+      newPlayers[myPlayerIndex].inJail = true;
+      newPlayers[myPlayerIndex].jailRoundsLeft = -1; 
+      msg += `進入靜心房反省！\n(下次輪到你需擲杯請示才能離開)`;
       nextState = 'END_TURN';
     } else if (sq.type === 'PROPERTY') {
       const ownerId = gameData.properties?.[sq.id];
       if (ownerId !== undefined && ownerId !== myPlayerIndex) {
-        const rent = Math.floor(sq.price * 0.4);
-        newPlayers[myPlayerIndex].money -= rent;
-        newPlayers[ownerId].money += rent;
-        msg += `踩到 ${gameData.players[ownerId].name} 的地盤，支付過路費 $${rent}。`;
+        const owner = newPlayers[ownerId];
+        if (!owner.inJail && !owner.isBankrupt) { // 坐牢收不到租金
+           const rent = Math.floor(sq.price * 0.4);
+           newPlayers[myPlayerIndex].money -= rent;
+           newPlayers[ownerId].money += rent;
+           msg += `踩到 ${owner.name} 的地盤，支付過路費 $${rent}。`;
+        } else {
+           msg += `${owner.name} ${owner.inJail ? '正在坐牢' : '已破產'}，免付過路費！`;
+        }
         nextState = 'END_TURN';
       } else if (ownerId === undefined) {
         msg += `來到空地：${sq.name}。`;
       } else {
-        msg += `來到自己的土地。`;
+        msg += `來到自己的土地，巡視產業。`;
         nextState = 'END_TURN';
       }
     } else {
@@ -402,52 +518,75 @@ export default function App() {
       nextState = 'END_TURN';
     }
 
+    const bankruptCheck = checkBankruptcy(newPlayers);
+    if (bankruptCheck.changed && bankruptCheck.newPlayers[myPlayerIndex].isBankrupt) {
+       msg += `\n🚨 資金或信用歸零，宣告破產！`;
+       nextState = 'END_TURN';
+    }
+
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
-        players: newPlayers,
+        players: bankruptCheck.newPlayers,
+        properties: bankruptCheck.changed ? clearBankruptProperties(gameData.properties, bankruptCheck.newPlayers.filter(p=>p.isBankrupt).map(p=>p.id)) : gameData.properties,
         gameState: nextState,
         actionMessage: msg
       });
     } catch (e) { console.error("Land error", e); }
   };
 
-  // 🌟 4. 靜心室「擲杯」系統
+  // 🌟 5. 靜心室「擲杯」系統 (重製版)
   const handleBwaBwei = async () => {
     if (gameData.currentPlayerIdx !== myPlayerIndex) return;
     
-    // 50% 機率是聖杯
-    const isHoly = Math.random() > 0.5; 
+    // 擲三次杯 (大於0.5算聖杯)
+    const results = Array(3).fill(0).map(() => Math.random() > 0.5);
+    const holyCount = results.filter(r => r).length;
     const newPlayers = [...gameData.players];
+    let msg = `擲杯結果：${holyCount} 次聖杯！\n`;
 
     try {
-      if (isHoly) {
-        newPlayers[myPlayerIndex].inJail = false; // 出獄
+      if (holyCount === 3) {
+        newPlayers[myPlayerIndex].jailRoundsLeft = 0;
+        newPlayers[myPlayerIndex].money -= 500;
+        newPlayers[myPlayerIndex].inJail = false;
+        msg += `神明原諒你了！(繳交罰款 $500)\n立刻出獄，可以繼續擲骰子。`;
+        
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
           players: newPlayers,
-          gameState: 'IDLE', // 轉回普通等待擲骰子狀態
-          actionMessage: '擲出【聖杯】！\n神明原諒你了，可以繼續擲骰子前進。'
+          gameState: 'IDLE', // 回到閒置可擲骰狀態
+          actionMessage: msg
         });
       } else {
+        const waitRounds = 3 - holyCount; // 2聖=等1輪, 1聖=等2輪, 0聖=等3輪
+        newPlayers[myPlayerIndex].jailRoundsLeft = waitRounds;
+        msg += `需在靜心房繼續反省 ${waitRounds} 輪。`;
+
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+          players: newPlayers,
           gameState: 'END_TURN',
-          actionMessage: '擲出【笑杯 / 無杯】...\n神明要你繼續反省，回合結束。'
+          actionMessage: msg
         });
       }
     } catch (e) { console.error("BwaBwei error", e); }
   };
 
-  // 🌟 5. 購買土地 (新增防當機 Try Catch)
+  // 🌟 購買土地
   const handleBuyProperty = async () => {
     try {
       const player = gameData.players[myPlayerIndex];
       const sq = BOARD_SQUARES[player.pos];
+      
+      const pMoney = Number(player.money || 0);
+      const pTrust = Number(player.trust || 0);
+      const reqMoney = Number(sq.price || 0);
+      const reqTrust = Number(sq.reqTrust || 0);
 
-      if (player.money >= sq.price && player.trust >= sq.reqTrust) {
+      if (pMoney >= reqMoney && pTrust >= reqTrust) {
         const newPlayers = [...gameData.players];
-        newPlayers[myPlayerIndex].money -= sq.price;
+        newPlayers[myPlayerIndex].money -= reqMoney;
 
         const currentProps = gameData.properties || {};
-        const newProps = { ...currentProps, [sq.id]: player.id }; // 記錄主人
+        const newProps = { ...currentProps, [sq.id]: player.id }; 
 
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
           players: newPlayers,
@@ -458,20 +597,91 @@ export default function App() {
       }
     } catch(e) {
       console.error("Buy property error:", e);
-      setErrorMsg("購買時發生錯誤，請稍後再試。");
     }
   };
 
+  // 🌟 管理資產：變賣房產
+  const handleSellProperty = async (sqId) => {
+     try {
+        const player = gameData.players[myPlayerIndex];
+        const sq = BOARD_SQUARES[sqId];
+        const isHighTrust = player.trust > 10;
+        const sellPrice = isHighTrust ? sq.price : Math.floor(sq.price / 2);
+
+        const newPlayers = [...gameData.players];
+        newPlayers[myPlayerIndex].money += sellPrice;
+
+        const newProps = { ...gameData.properties };
+        delete newProps[sqId];
+
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+            players: newPlayers,
+            properties: newProps
+        });
+     } catch (e) {}
+  };
+
+  // 🌟 管理資產：抵押信用
+  const handleMortgageTrust = async () => {
+     try {
+         const player = gameData.players[myPlayerIndex];
+         if (player.trust <= 1) return; // 不能全部換光，否則會破產
+         
+         const isHighTrust = player.trust >= 10;
+         const exchangeRate = isHighTrust ? 1000 : 500;
+
+         const newPlayers = [...gameData.players];
+         newPlayers[myPlayerIndex].trust -= 1;
+         newPlayers[myPlayerIndex].money += exchangeRate;
+
+         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+             players: newPlayers
+         });
+     } catch(e) {}
+  };
+
+  // 結束回合
   const handleEndTurn = async () => {
     try {
-      const nextIdx = (gameData.currentPlayerIdx + 1) % gameData.players.length;
+      const newPlayers = [...gameData.players];
+      const bankruptCheck = checkBankruptcy(newPlayers);
+      let nextIdx = gameData.currentPlayerIdx;
+      
+      // 尋找下一個未破產的玩家
+      let attempts = 0;
+      do {
+          nextIdx = (nextIdx + 1) % gameData.players.length;
+          attempts++;
+      } while (bankruptCheck.newPlayers[nextIdx].isBankrupt && attempts < 10);
+
+      // 自動處理靜心房倒數
+      const nextPlayer = bankruptCheck.newPlayers[nextIdx];
+      let nextState = 'IDLE';
+      let msg = '';
+
+      if (nextPlayer.inJail && nextPlayer.jailRoundsLeft > 0) {
+          bankruptCheck.newPlayers[nextIdx].jailRoundsLeft -= 1;
+          
+          if (bankruptCheck.newPlayers[nextIdx].jailRoundsLeft === 0) {
+              bankruptCheck.newPlayers[nextIdx].money -= 500;
+              bankruptCheck.newPlayers[nextIdx].inJail = false;
+              msg = `${nextPlayer.name} 反省期滿，繳交罰金 $500，離開靜心房！`;
+          } else {
+              nextState = 'END_TURN'; // 直接跳過
+              msg = `${nextPlayer.name} 仍在靜心房反省中... (剩餘 ${bankruptCheck.newPlayers[nextIdx].jailRoundsLeft} 輪)`;
+          }
+      }
+
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+        players: bankruptCheck.newPlayers,
+        properties: bankruptCheck.changed ? clearBankruptProperties(gameData.properties, bankruptCheck.newPlayers.filter(p=>p.isBankrupt).map(p=>p.id)) : gameData.properties,
         currentPlayerIdx: nextIdx,
-        gameState: 'IDLE',
-        actionMessage: ''
+        gameState: nextState,
+        actionMessage: msg
       });
     } catch(e) { console.error("End turn error", e); }
   };
+
 
   // ==========================================
   // 🎨 畫面渲染區
@@ -581,9 +791,49 @@ export default function App() {
     );
   }
 
+  // 🏆 遊戲結束結算畫面
+  if (gameData.gameState === 'GAME_OVER') {
+     const rankedPlayers = [...gameData.players].sort((a, b) => {
+         if (b.trust !== a.trust) return b.trust - a.trust; // 信用優先
+         return b.money - a.money; // 金錢其次
+     });
+
+     return (
+        <div className="h-screen w-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
+            <Trophy size={100} className="text-yellow-400 mb-6 animate-bounce" />
+            <h1 className="text-6xl font-black mb-10 text-yellow-400 drop-shadow-lg">遊戲結束</h1>
+            <div className="bg-slate-800 p-8 rounded-3xl w-full max-w-lg shadow-2xl border-4 border-slate-700">
+                <h2 className="text-2xl font-bold mb-6 text-slate-300 border-b border-slate-600 pb-4">🌟 大信翁排行榜 🌟</h2>
+                {rankedPlayers.map((p, i) => (
+                    <div key={p.id} className={`flex items-center justify-between p-4 mb-3 rounded-2xl ${i === 0 ? 'bg-yellow-500/20 border-2 border-yellow-500' : 'bg-slate-700'}`}>
+                        <div className="flex items-center gap-4">
+                            <span className={`font-black text-2xl ${i === 0 ? 'text-yellow-400' : 'text-slate-400'}`}>#{i+1}</span>
+                            <div className="text-4xl">{p.icon}</div>
+                            <span className="font-bold text-xl">{p.name} {p.isBankrupt && '(破產)'}</span>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-yellow-400 font-black text-xl flex items-center gap-1"><Star size={16} fill="currentColor"/> {p.trust}</div>
+                            <div className="text-green-400 font-bold text-sm">${p.money}</div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <button onClick={() => window.location.reload()} className="mt-8 px-8 py-4 bg-slate-700 hover:bg-slate-600 rounded-full font-bold text-xl transition shadow-lg">返回首頁</button>
+        </div>
+     );
+  }
+
   const currentPlayer = gameData.players[gameData.currentPlayerIdx];
   const myPlayer = gameData.players[myPlayerIndex];
   const currentSquare = myPlayer ? BOARD_SQUARES[myPlayer.pos] : null;
+
+  const myTrust = Number(myPlayer?.trust || 0);
+  const myMoney = Number(myPlayer?.money || 0);
+  const reqTrust = Number(currentSquare?.reqTrust || 0);
+  const reqMoney = Number(currentSquare?.price || 0);
+  const canBuy = myMoney >= reqMoney && myTrust >= reqTrust;
+
+  const myProperties = Object.keys(gameData.properties || {}).filter(sqId => gameData.properties[sqId] === myPlayerIndex);
 
   return (
     <div className="h-screen w-screen bg-[#0a192f] overflow-hidden relative touch-none select-none font-sans">
@@ -591,8 +841,8 @@ export default function App() {
       {/* 🌟 頂部玩家儀表板 */}
       <div className="absolute top-4 left-4 right-20 z-50 flex gap-4 overflow-x-auto pb-4 px-2 pointer-events-auto items-center">
         <div className="bg-slate-800 text-white rounded-full px-5 py-2 flex items-center justify-center gap-2 font-mono font-bold shadow-lg h-14 shrink-0 border-2 border-slate-700">
-          <Timer size={18} className={gameData.timeLeft < 60 ? "text-red-400 animate-pulse" : "text-slate-300"}/> 
-          {formatTime(gameData.timeLeft)}
+          <Timer size={18} className={localTimeLeft < 60 && localTimeLeft > 0 ? "text-red-400 animate-pulse" : "text-slate-300"}/> 
+          {formatTime(localTimeLeft)}
         </div>
         
         <div className="bg-[#fffbf0] text-slate-800 rounded-full px-5 py-2 flex items-center justify-center font-black shadow-lg h-14 shrink-0 border-2 border-yellow-400 tracking-wider">
@@ -600,26 +850,78 @@ export default function App() {
         </div>
 
         {gameData.players.map(p => (
-          <div key={p.id} className={`flex items-center gap-3 px-4 py-2 rounded-2xl border-2 shadow-lg h-14 shrink-0 transition-all duration-300 ${gameData.currentPlayerIdx === p.id ? 'border-blue-500 bg-blue-50 scale-105' : 'border-slate-300 bg-white/90 opacity-80'}`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-2xl shadow-sm bg-white border border-slate-200`}>
+          <div key={p.id} className={`flex items-center gap-3 px-4 py-2 rounded-2xl border-2 shadow-lg h-14 shrink-0 transition-all duration-300 ${gameData.currentPlayerIdx === p.id ? 'border-blue-500 bg-blue-50 scale-105' : 'border-slate-300 bg-white/90 opacity-80'} ${p.isBankrupt ? 'grayscale opacity-50' : ''}`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-2xl shadow-sm bg-white border border-slate-200 relative`}>
               {p.icon}
+              {p.inJail && !p.isBankrupt && <div className="absolute -top-2 -right-2 text-xs">🙏</div>}
             </div>
             <div className="flex flex-col justify-center min-w-[80px]">
               <div className="text-[11px] font-bold text-slate-500 flex justify-between items-center leading-tight mb-0.5">
-                <span>{p.name}</span>
+                <span>{p.name} {p.isBankrupt && '(破產)'}</span>
                 {p.uid === user.uid && <span className="text-blue-500 ml-1">(你)</span>}
               </div>
-              {p.uid !== null ? (
+              {p.uid !== null && !p.isBankrupt ? (
                 <div className="flex gap-2 items-baseline leading-none">
-                  <span className="text-sm font-black text-emerald-600">${p.money}</span>
-                  <span className="text-[10px] font-bold text-yellow-600 flex items-center gap-0.5"><Star size={10} fill="currentColor"/> {p.trust}</span>
+                  <span className={`text-sm font-black ${p.money < 0 ? 'text-red-500' : 'text-emerald-600'}`}>${p.money}</span>
+                  <span className={`text-[10px] font-bold flex items-center gap-0.5 ${p.trust <= 0 ? 'text-red-500' : 'text-yellow-600'}`}><Star size={10} fill="currentColor"/> {p.trust}</span>
                 </div>
               ) : (
-                <span className="text-xs font-bold text-slate-400 italic">等待加入...</span>
+                <span className="text-xs font-bold text-slate-400 italic">{p.isBankrupt ? '出局' : '等待加入...'}</span>
               )}
             </div>
           </div>
         ))}
+      </div>
+
+      {/* 🌟 遊戲控制區：左下角資產管理 */}
+      <div className="absolute bottom-6 left-6 z-50 pointer-events-auto">
+         <button onClick={() => setShowAssetManager(!showAssetManager)} className={`p-4 rounded-full shadow-2xl font-black text-lg transition border-4 ${showAssetManager ? 'bg-orange-500 text-white border-orange-300' : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-50'}`}>
+            <Briefcase size={28}/>
+         </button>
+
+         {/* 資產管理面板 */}
+         {showAssetManager && (
+            <div className="absolute bottom-20 left-0 bg-white p-6 rounded-3xl shadow-2xl border-4 border-slate-800 w-80 animate-in slide-in-from-bottom-4">
+                <div className="flex justify-between items-center border-b-2 border-slate-100 pb-3 mb-4">
+                    <h3 className="font-black text-xl text-slate-800">💼 管理資產</h3>
+                    <button onClick={() => setShowAssetManager(false)} className="text-slate-400 hover:text-slate-600 font-bold">關閉</button>
+                </div>
+
+                <div className="mb-5">
+                    <div className="text-sm font-bold text-slate-500 mb-2">信用抵押 (1 點兌換現金)</div>
+                    <button 
+                       onClick={handleMortgageTrust}
+                       disabled={myPlayer?.trust <= 1}
+                       className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${myPlayer?.trust > 1 ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-slate-100 text-slate-400'}`}
+                    >
+                       <Star size={16} fill="currentColor"/> 
+                       {myPlayer?.trust >= 10 ? '換取 $1000' : '換取 $500 (信用不足10點)'}
+                    </button>
+                </div>
+
+                <div>
+                    <div className="text-sm font-bold text-slate-500 mb-2">變賣房產</div>
+                    {myProperties.length === 0 ? (
+                        <div className="text-center text-slate-400 italic py-4 bg-slate-50 rounded-xl">你目前沒有任何土地</div>
+                    ) : (
+                        <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-2">
+                           {myProperties.map(sqId => {
+                               const sq = BOARD_SQUARES[sqId];
+                               const sellPrice = myPlayer.trust >= 10 ? sq.price : Math.floor(sq.price / 2);
+                               return (
+                                   <div key={sqId} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                       <span className="font-bold text-slate-700">{sq.name}</span>
+                                       <button onClick={() => handleSellProperty(sqId)} className="bg-red-100 hover:bg-red-200 text-red-600 font-bold px-3 py-1.5 rounded-lg text-sm transition">
+                                           賣出 ${sellPrice}
+                                       </button>
+                                   </div>
+                               );
+                           })}
+                        </div>
+                    )}
+                </div>
+            </div>
+         )}
       </div>
 
       {/* 🌟 右側浮動控制列 */}
@@ -638,10 +940,21 @@ export default function App() {
         </button>
       </div>
 
+      {/* 🌟 全螢幕真實骰子滾動動畫 */}
+      {gameData.gameState === 'ROLLING' && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-md">
+          <div className="text-white font-black text-4xl mb-10 tracking-widest animate-pulse drop-shadow-lg">擲骰子中...</div>
+          <div className="flex gap-10">
+            <DiceIcon value={displayDice[0]} className="w-40 h-40 text-white animate-bounce drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0s' }} />
+            <DiceIcon value={displayDice[1]} className="w-40 h-40 text-white animate-bounce drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0.1s' }} />
+          </div>
+        </div>
+      )}
+
       {/* 顯示骰出的點數 */}
-      {gameData.gameState !== 'IDLE' && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-white/95 p-3 px-6 rounded-full shadow-2xl font-black text-2xl flex items-center gap-4 z-50 border-4 border-blue-500">
-          🎲 {gameData.diceVals[0]} + {gameData.diceVals[1]} = {gameData.diceVals[0] + gameData.diceVals[1]} 步
+      {(gameData.gameState === 'MOVING' || gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && gameData.diceVals && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-white/95 p-3 px-8 rounded-full shadow-2xl font-black text-2xl flex items-center gap-4 z-50 border-4 border-blue-500">
+          🎲 {gameData.diceVals[0]} + {gameData.diceVals[1]} = <span className="text-blue-600 text-3xl">{gameData.diceVals[0] + gameData.diceVals[1]}</span> 步
         </div>
       )}
 
@@ -661,8 +974,7 @@ export default function App() {
             {BOARD_SQUARES.map((sq, idx) => {
               const {row, col} = GRID_ORDER[idx];
               const owner = gameData.players.find(p => gameData.properties?.[idx] === p.id);
-              
-              const activePlayersHere = gameData.players.filter(p => p.pos === idx && p.uid !== null);
+              const activePlayersHere = gameData.players.filter(p => p.pos === idx && p.uid !== null && !p.isBankrupt);
               
               const isLeft = idx >= 11 && idx <= 19;
               const isTop = idx >= 21 && idx <= 29;
@@ -690,23 +1002,19 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* 🌟 玩家棋子與動畫計步器 */}
+                  {/* 🌟 玩家棋子與超大倒數計步器 */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                     {activePlayersHere.map((p, pIdx) => (
                       <div key={p.id} className="relative transition-all duration-300 ease-linear" style={{ transform: `translate(${pIdx * 8}px, ${pIdx * 8}px)` }}>
                         
-                        {/* 🌟 倒數計步器：只有在移動中且有剩餘步數時顯示 */}
                         {gameData.gameState === 'MOVING' && gameData.currentPlayerIdx === p.id && gameData.remainingSteps > 0 && (
-                          <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-white border-2 border-blue-600 text-blue-600 font-black rounded-full w-6 h-6 flex items-center justify-center text-sm shadow-lg animate-bounce z-40">
+                          <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-white border-4 border-blue-600 text-blue-600 font-black rounded-full w-14 h-14 flex items-center justify-center text-3xl shadow-[0_5px_15px_rgba(0,0,0,0.5)] animate-bounce z-50">
                             {gameData.remainingSteps}
                           </div>
                         )}
 
-                        {/* 🌟 靜心房祈禱標記 */}
                         {p.inJail && (
-                          <div className="absolute -top-3 -right-3 text-xl animate-pulse drop-shadow-md z-40">
-                            🙏
-                          </div>
+                          <div className="absolute -top-4 -right-4 text-3xl animate-pulse drop-shadow-md z-40">🙏</div>
                         )}
 
                         <div className={`w-14 h-14 bg-white rounded-full border-[3px] border-slate-200 flex items-center justify-center text-3xl shadow-xl transition-all duration-300 ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400' : 'z-10 opacity-95'}`}>
@@ -722,65 +1030,64 @@ export default function App() {
         </div>
       </div>
 
-      {/* 🎮 遊戲控制面板 (置中或靠右下) */}
-      {gameData.currentPlayerIdx === myPlayerIndex && (
+      {/* 🎮 遊戲控制面板 */}
+      {gameData.currentPlayerIdx === myPlayerIndex && !myPlayer?.isBankrupt && (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col gap-3 z-50 pointer-events-auto">
           
-          {/* 🌟 狀態 1：還沒行動 (判斷是正常擲骰還是靜心房擲杯) */}
           {gameData.gameState === 'IDLE' && (
             <>
-              {myPlayer?.inJail ? (
-                // 靜心房專用擲杯按鈕
-                <div className="flex flex-col items-center gap-2">
-                  <div className="bg-slate-800 text-white font-bold px-4 py-2 rounded-xl shadow-lg border-2 border-slate-700 text-sm animate-pulse mb-1">
-                    你在靜心房反省中...
+              {myPlayer?.jailRoundsLeft === -1 ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="bg-slate-800 text-white font-bold px-6 py-3 rounded-full shadow-lg border-2 border-slate-700 text-lg animate-pulse mb-1">
+                    你被送進靜心房了！
                   </div>
                   <button onClick={handleBwaBwei} className="px-10 py-5 bg-red-600 hover:bg-red-500 text-white rounded-full font-black text-3xl shadow-[0_10px_0_0_#991b1b,0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_#991b1b,0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-3 border-4 border-white animate-bounce">
-                    🙏 擲杯請示神明
+                    🙏 擲 3 次杯請示神明
                   </button>
                 </div>
               ) : (
-                // 正常擲骰子按鈕
                 <div className="flex flex-col items-center gap-2">
-                  {gameData.actionMessage && <div className="bg-white/90 text-slate-800 font-bold px-4 py-2 rounded-xl shadow-lg border-2 border-slate-300 text-sm mb-1 text-center whitespace-pre-line">{gameData.actionMessage}</div>}
-                  <button onClick={handleRollDice} className="px-10 py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-3xl shadow-[0_10px_0_0_#1e3a8a,0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_#1e3a8a,0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-3 border-4 border-white animate-bounce">
-                    <Dice5 size={32} /> 擲骰子
+                  {gameData.actionMessage && <div className="bg-white/95 text-slate-800 font-bold px-6 py-3 rounded-2xl shadow-lg border-4 border-slate-300 text-lg mb-2 text-center whitespace-pre-line">{gameData.actionMessage}</div>}
+                  <button onClick={handleRollDice} className="px-12 py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-4xl shadow-[0_10px_0_0_#1e3a8a,0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_#1e3a8a,0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-4 border-4 border-white animate-bounce">
+                    <Dice5 size={40} /> 擲骰子
                   </button>
                 </div>
               )}
             </>
           )}
 
-          {/* 🌟 狀態 2 & 3：行動階段與結束確認 */}
           {(gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && (
-            <div className="bg-white p-6 rounded-3xl shadow-2xl flex flex-col gap-4 border-4 border-slate-800 min-w-[300px]">
+            <div className="bg-white p-6 rounded-3xl shadow-2xl flex flex-col gap-4 border-4 border-slate-800 min-w-[320px]">
               {gameData.actionMessage.split('\n').map((line, i) => (
-                <div key={i} className="font-black text-center text-slate-800 text-lg leading-snug">{line}</div>
+                <div key={i} className="font-black text-center text-slate-800 text-xl leading-snug">{line}</div>
               ))}
               
-              <div className="border-t-2 border-slate-100 my-1"></div>
+              <div className="border-t-2 border-slate-200 my-2"></div>
 
-              {/* 🌟 購買按鈕 (加入信用點數嚴格判斷與提示) */}
               {gameData.gameState === 'ACTION' && currentSquare?.type === 'PROPERTY' && !gameData.properties[myPlayer.pos] && (
                 <button 
-                  onClick={handleBuyProperty} 
-                  disabled={myPlayer.money < currentSquare.price || myPlayer.trust < currentSquare.reqTrust}
-                  className={`font-black py-4 px-6 rounded-2xl active:scale-95 transition-transform text-lg flex flex-col items-center justify-center 
-                    ${myPlayer.money >= currentSquare.price && myPlayer.trust >= currentSquare.reqTrust 
-                      ? 'bg-green-500 hover:bg-green-400 text-white shadow-lg' 
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                  onClick={canBuy ? handleBuyProperty : undefined} 
+                  disabled={!canBuy}
+                  className={`font-black py-5 px-6 rounded-2xl transition-all text-xl flex flex-col items-center justify-center border-b-4
+                    ${canBuy 
+                      ? 'bg-green-500 hover:bg-green-400 text-white border-green-700 active:border-b-0 active:translate-y-1 shadow-lg cursor-pointer' 
+                      : 'bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed opacity-90'}`}
                 >
-                  {myPlayer.money < currentSquare.price ? (
-                    <span>資金不足 ($${currentSquare.price})</span>
-                  ) : myPlayer.trust < currentSquare.reqTrust ? (
-                    <span className="flex items-center gap-1">信用不足 (缺 {currentSquare.reqTrust - myPlayer.trust} 點 <Star size={16} fill="currentColor"/>)</span>
+                  {!canBuy ? (
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-red-500 line-through">無法購買土地</span>
+                      <span className="text-sm font-bold flex items-center gap-1 text-red-500">
+                        {myMoney < reqMoney ? `資金不足 (缺 $${reqMoney - myMoney})` : `信用不足 (缺 ${reqTrust - myTrust} 點) `}
+                        {myMoney >= reqMoney && <Star size={14} fill="currentColor"/>}
+                      </span>
+                    </div>
                   ) : (
-                    <span>購買土地 ($${currentSquare.price})</span>
+                    <span>💰 購買土地 ($${reqMoney})</span>
                   )}
                 </button>
               )}
               
-              <button onClick={handleEndTurn} className="bg-slate-800 hover:bg-slate-700 text-white font-black py-4 px-6 rounded-2xl active:scale-95 transition-transform shadow-lg text-lg">
+              <button onClick={handleEndTurn} className="bg-slate-800 hover:bg-slate-700 text-white font-black py-5 px-6 rounded-2xl active:translate-y-1 active:border-b-0 transition-all shadow-lg text-xl border-b-4 border-black">
                 結束回合
               </button>
             </div>
