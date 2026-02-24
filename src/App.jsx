@@ -6,7 +6,7 @@ import {
   Coins, Map, LocateFixed, Volume2, VolumeX, 
   Music, Users, Play, ChevronRight, Store, 
   Trophy, Timer, Gift, PlusCircle, MinusCircle, LogOut,
-  Target, Info, Building2, QrCode, Link2, Copy, Smartphone, Star
+  Target, Info, Building2, QrCode, Link2, Copy, Smartphone, Star, Clock, Users as UsersIcon
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -71,7 +71,7 @@ const GRID_ORDER = (() => {
   return order;
 })();
 
-const CHILD_AVATARS = ['👦', '👧', '👶', '👼', '👲', '👸', '🤴', '🤓', '🤠', '😎', '👻', '👽'];
+const CHILD_AVATARS = ['👦', '👧', '👶', '👼', '👲', '👸', '🤴', '🤓', '🤠', '😎', '👻', '👽', '🤖', '👾', '🦊', '🐼'];
 
 // =========================================================
 // 👇 請將您的 Firebase 金鑰貼在下方的引號 "" 內 👇
@@ -101,6 +101,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
 
+
 // --- 3. 輔助函數 ---
 const formatTime = (seconds) => {
   if (seconds === -1) return "不限時";
@@ -109,9 +110,24 @@ const formatTime = (seconds) => {
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
+const getOwnerBgColor = (colorClass) => {
+  const map = {
+    'bg-blue-500': 'bg-blue-300', 'bg-red-500': 'bg-red-300',
+    'bg-green-500': 'bg-green-300', 'bg-purple-500': 'bg-purple-300',
+    'bg-orange-500': 'bg-orange-300', 'bg-pink-500': 'bg-pink-300',
+  };
+  return map[colorClass] || 'bg-gray-300';
+};
+
 // --- 4. 主程式組件 ---
 export default function App() {
   const [appPhase, setAppPhase] = useState('LANDING'); 
+  
+  const [setupMode, setSetupMode] = useState('INIT'); 
+  const [setupPlayerCount, setSetupPlayerCount] = useState(4);
+  const [setupTimeLimit, setSetupTimeLimit] = useState(600);
+  const [setupAvatar, setSetupAvatar] = useState(CHILD_AVATARS[0]);
+  
   const [user, setUser] = useState(null);
   const [roomId, setRoomId] = useState("");
   const [isHost, setIsHost] = useState(false);
@@ -120,7 +136,8 @@ export default function App() {
 
   const [gameData, setGameData] = useState({
     players: [], currentPlayerIdx: 0, properties: {},
-    gameState: 'IDLE', timeLeft: 0, diceVals: [1, 1], actionMessage: ''
+    gameState: 'IDLE', timeLeft: 0, diceVals: [1, 1], actionMessage: '',
+    remainingSteps: 0 // 新增：用於步數倒數與動畫
   });
 
   const [zoom, setZoom] = useState(0.8);
@@ -133,7 +150,7 @@ export default function App() {
   const mapRef = useRef(null);
   const MAP_SIZE = 1600;
 
-  // --- 手動地圖拖曳 (防報錯機制) ---
+  // --- 手動地圖拖曳 ---
   useEffect(() => {
     const el = mapRef.current;
     if (!el) return;
@@ -220,12 +237,11 @@ export default function App() {
       x: viewportSize.w / 2 - ((col - 1) * CELL_SIZE + CELL_SIZE / 2) * displayZoom, 
       y: viewportSize.h / 2 - ((row - 1) * CELL_SIZE + CELL_SIZE / 2) * displayZoom 
     });
-    setManualOffset({ x: 0, y: 0 }); // 重置手動拖曳
+    setManualOffset({ x: 0, y: 0 }); 
   }, [gameData.players, gameData.currentPlayerIdx, viewportSize, zoom]);
 
   const displayZoom = isFullMapMode ? Math.min(viewportSize.w / MAP_SIZE, viewportSize.h / MAP_SIZE) * 0.9 : zoom;
   
-  // 自動跟隨回合切換
   useEffect(() => {
     if (appPhase !== 'GAME' || isFullMapMode) {
       if (isFullMapMode) {
@@ -240,67 +256,118 @@ export default function App() {
     focusOnCurrentPlayer();
   }, [gameData.currentPlayerIdx, gameData.players[gameData.currentPlayerIdx]?.pos, isFullMapMode, displayZoom, viewportSize, appPhase, focusOnCurrentPlayer]);
 
-  // --- 房間邏輯 ---
-  const createRoom = async (count) => {
+  // --- 房間創建邏輯 ---
+  const handleCreateRoom = async () => {
     if (!user) return;
     const id = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const players = Array.from({ length: count }).map((_, i) => ({
-      id: i, name: `玩家 ${i + 1}`, icon: CHILD_AVATARS[i],
+    const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
+      id: i, 
+      name: `玩家 ${i + 1}`, 
+      icon: i === 0 ? setupAvatar : '⏳', 
       color: ['bg-blue-500', 'bg-red-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'][i],
-      pos: 0, money: BASE_MONEY, trust: BASE_TRUST, uid: i === 0 ? user.uid : null
+      pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
+      inJail: false, // 🌟 新增：入獄狀態追蹤
+      uid: i === 0 ? user.uid : null 
     }));
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
-        players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: 600, properties: {}, actionMessage: ''
+        players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0
       });
       setRoomId(id); setIsHost(true); setMyPlayerIndex(0); setAppPhase('GAME');
     } catch (e) { setErrorMsg("建立失敗，請確認 Firebase 設定。"); }
   };
 
-  const joinRoom = async (id) => {
-    if (!user || !id) return;
+  const handleJoinRoom = async () => {
+    if (!user || roomId.length < 4) return;
     try {
-      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id);
+      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
       const snap = await getDoc(roomRef);
       if (!snap.exists()) { setErrorMsg("找不到房號！"); return; }
       const data = snap.data();
       const slot = data.players.findIndex(p => p.uid === null);
       if (slot === -1) { setErrorMsg("房間已滿！"); return; }
+      
       data.players[slot].uid = user.uid;
+      data.players[slot].icon = setupAvatar;
+      data.players[slot].inJail = false; // 確保有此欄位
+      
       await updateDoc(roomRef, { players: data.players });
-      setRoomId(id); setMyPlayerIndex(slot); setAppPhase('GAME');
+      setMyPlayerIndex(slot); setAppPhase('GAME');
     } catch (e) { setErrorMsg("加入失敗。"); }
   };
 
   // ==========================================
-  // 🎲 完整遊戲核心邏輯
+  // 🎲 核心遊戲邏輯：動畫與事件處理
   // ==========================================
 
+  // 1. 擲骰子並進入「移動狀態」
   const handleRollDice = async () => {
     if (gameData.currentPlayerIdx !== myPlayerIndex) return;
 
     const d1 = Math.floor(Math.random() * 6) + 1;
     const d2 = Math.floor(Math.random() * 6) + 1;
     const steps = d1 + d2;
+
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+        diceVals: [d1, d2],
+        remainingSteps: steps,
+        gameState: 'MOVING', // 🌟 進入「一步一步移動」的動畫狀態
+        actionMessage: ''
+      });
+    } catch (e) { console.error("Roll dice error", e); }
+  };
+
+  // 🌟 2. 移動動畫引擎 (使用 useEffect 控制分步寫入 Firebase)
+  useEffect(() => {
+    if (appPhase !== 'GAME') return;
+    if (gameData.gameState !== 'MOVING') return;
+    // 只有「當前行動的玩家」負責發送移動訊號，其他玩家被動接收畫面更新
+    if (gameData.currentPlayerIdx !== myPlayerIndex) return;
+
+    const moveTimer = setTimeout(async () => {
+      try {
+        const player = gameData.players[myPlayerIndex];
+        
+        // 還有步數，繼續往前走一格
+        if (gameData.remainingSteps > 0) {
+          let newPos = (player.pos + 1) % 40;
+          let newMoney = player.money;
+          let msg = gameData.actionMessage || '';
+          
+          if (newPos === 0) {
+            newMoney += 500;
+            msg = '經過起點，獲得 $500！\n';
+          }
+          
+          const newPlayers = [...gameData.players];
+          newPlayers[myPlayerIndex] = { ...player, pos: newPos, money: newMoney };
+
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+            players: newPlayers,
+            remainingSteps: gameData.remainingSteps - 1, // 步數減 1
+            actionMessage: msg
+          });
+        } 
+        // 步數走完，觸發該格子的事件
+        else {
+          await handleLandOnSquare();
+        }
+      } catch (e) {
+        console.error("Move step error", e);
+      }
+    }, 350); // 🌟 控制每步動畫的速度 (350毫秒)
+
+    return () => clearTimeout(moveTimer);
+  }, [gameData.gameState, gameData.remainingSteps, gameData.currentPlayerIdx, myPlayerIndex]);
+
+  // 3. 觸發降落格子的事件
+  const handleLandOnSquare = async () => {
     const player = gameData.players[myPlayerIndex];
-
-    let newPos = player.pos + steps;
-    let newMoney = player.money;
-    let newTrust = player.trust;
-    let passedStart = false;
-
-    if (newPos >= 40) {
-      newPos = newPos % 40;
-      newMoney += 500; 
-      passedStart = true;
-    }
-
-    const newPlayers = [...gameData.players];
-    newPlayers[myPlayerIndex] = { ...player, pos: newPos, money: newMoney, trust: newTrust };
-    
-    const sq = BOARD_SQUARES[newPos];
+    const sq = BOARD_SQUARES[player.pos];
     let nextState = 'ACTION';
-    let msg = passedStart ? '經過起點，獲得 $500！\n' : '';
+    let msg = gameData.actionMessage || '';
+    const newPlayers = [...gameData.players];
 
     if (sq.type === 'TAX') {
       newPlayers[myPlayerIndex].money -= sq.amount;
@@ -311,12 +378,13 @@ export default function App() {
       newPlayers[myPlayerIndex].trust += sq.effectT;
       msg += `抽中卡片：${sq.desc}！\n金錢 ${sq.effectM > 0 ? '+'+sq.effectM : sq.effectM}，信用 ${sq.effectT > 0 ? '+'+sq.effectT : sq.effectT}。`;
       nextState = 'END_TURN';
-    } else if (sq.type === 'GO_TO_JAIL') {
+    } else if (sq.type === 'GO_TO_JAIL' || sq.id === 30) {
       newPlayers[myPlayerIndex].pos = 10;
-      msg += `直接進入靜心房反省！`;
+      newPlayers[myPlayerIndex].inJail = true; // 🌟 標記入獄
+      msg += `被抓進靜心房了！(下次行動需擲出聖杯才能離開)`;
       nextState = 'END_TURN';
     } else if (sq.type === 'PROPERTY') {
-      const ownerId = gameData.properties[newPos];
+      const ownerId = gameData.properties?.[sq.id];
       if (ownerId !== undefined && ownerId !== myPlayerIndex) {
         const rent = Math.floor(sq.price * 0.4);
         newPlayers[myPlayerIndex].money -= rent;
@@ -334,56 +402,180 @@ export default function App() {
       nextState = 'END_TURN';
     }
 
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
-      players: newPlayers,
-      diceVals: [d1, d2],
-      gameState: nextState,
-      actionMessage: msg
-    });
-  };
-
-  const handleBuyProperty = async () => {
-    const player = gameData.players[myPlayerIndex];
-    const sq = BOARD_SQUARES[player.pos];
-
-    if (player.money >= sq.price && player.trust >= sq.reqTrust) {
-      const newPlayers = [...gameData.players];
-      newPlayers[myPlayerIndex].money -= sq.price;
-
-      const newProps = { ...gameData.properties, [player.pos]: player.id };
-
+    try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
         players: newPlayers,
-        properties: newProps,
-        gameState: 'END_TURN',
-        actionMessage: `成功購買 ${sq.name}！`
+        gameState: nextState,
+        actionMessage: msg
       });
+    } catch (e) { console.error("Land error", e); }
+  };
+
+  // 🌟 4. 靜心室「擲杯」系統
+  const handleBwaBwei = async () => {
+    if (gameData.currentPlayerIdx !== myPlayerIndex) return;
+    
+    // 50% 機率是聖杯
+    const isHoly = Math.random() > 0.5; 
+    const newPlayers = [...gameData.players];
+
+    try {
+      if (isHoly) {
+        newPlayers[myPlayerIndex].inJail = false; // 出獄
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+          players: newPlayers,
+          gameState: 'IDLE', // 轉回普通等待擲骰子狀態
+          actionMessage: '擲出【聖杯】！\n神明原諒你了，可以繼續擲骰子前進。'
+        });
+      } else {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+          gameState: 'END_TURN',
+          actionMessage: '擲出【笑杯 / 無杯】...\n神明要你繼續反省，回合結束。'
+        });
+      }
+    } catch (e) { console.error("BwaBwei error", e); }
+  };
+
+  // 🌟 5. 購買土地 (新增防當機 Try Catch)
+  const handleBuyProperty = async () => {
+    try {
+      const player = gameData.players[myPlayerIndex];
+      const sq = BOARD_SQUARES[player.pos];
+
+      if (player.money >= sq.price && player.trust >= sq.reqTrust) {
+        const newPlayers = [...gameData.players];
+        newPlayers[myPlayerIndex].money -= sq.price;
+
+        const currentProps = gameData.properties || {};
+        const newProps = { ...currentProps, [sq.id]: player.id }; // 記錄主人
+
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+          players: newPlayers,
+          properties: newProps,
+          gameState: 'END_TURN',
+          actionMessage: `成功購買 ${sq.name}！`
+        });
+      }
+    } catch(e) {
+      console.error("Buy property error:", e);
+      setErrorMsg("購買時發生錯誤，請稍後再試。");
     }
   };
 
   const handleEndTurn = async () => {
-    const nextIdx = (gameData.currentPlayerIdx + 1) % gameData.players.length;
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
-      currentPlayerIdx: nextIdx,
-      gameState: 'IDLE',
-      actionMessage: ''
-    });
+    try {
+      const nextIdx = (gameData.currentPlayerIdx + 1) % gameData.players.length;
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+        currentPlayerIdx: nextIdx,
+        gameState: 'IDLE',
+        actionMessage: ''
+      });
+    } catch(e) { console.error("End turn error", e); }
   };
 
-  // --- 畫面渲染 ---
+  // ==========================================
+  // 🎨 畫面渲染區
+  // ==========================================
   if (appPhase === 'LANDING') {
     return (
-      <div className="h-screen w-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
-        <Smartphone size={80} className="text-blue-400 mb-4 animate-bounce" />
-        <h1 className="text-4xl font-black mb-2">大信翁多人連線</h1>
-        <p className="text-slate-400 mb-8 font-bold text-sm">經典 UI 完美回歸版</p>
-        {errorMsg && <div className="mb-6 bg-red-600/30 p-4 rounded-xl border border-red-500 text-sm font-bold">{errorMsg}</div>}
-        <div className="flex flex-col gap-4 w-full max-w-xs">
-          <button disabled={!user} onClick={() => createRoom(4)} className={`py-4 rounded-2xl font-black text-xl shadow-xl transition ${!user ? 'bg-slate-700' : 'bg-blue-600'}`}>
-            {user ? "我要開房間" : "連線中..."}
-          </button>
-          <input type="text" placeholder="房號" value={roomId} onChange={e => setRoomId(e.target.value.toUpperCase())} className="bg-slate-800 p-4 rounded-xl text-center text-xl font-bold border-2 border-slate-700" />
-          <button disabled={!user || roomId.length < 4} onClick={() => joinRoom(roomId)} className="py-4 rounded-2xl font-black text-xl bg-white text-slate-900">加入遊戲</button>
+      <div className="h-screen w-full bg-[#fffbf0] flex flex-col items-center justify-center p-6 text-slate-800">
+        <h1 className="text-5xl font-black mb-8 text-[#d97706] tracking-widest drop-shadow-sm">信實人生大轉盤</h1>
+        
+        {errorMsg && <div className="mb-6 bg-red-100 text-red-600 p-4 rounded-xl font-bold border border-red-200">{errorMsg}</div>}
+        
+        <div className="bg-white border-[6px] border-yellow-300 p-8 rounded-[2rem] shadow-xl w-full max-w-md flex flex-col items-center gap-6">
+          
+          {/* --- 初始選單 --- */}
+          {setupMode === 'INIT' && (
+            <div className="flex flex-col gap-4 w-full">
+              <button disabled={!user} onClick={() => setSetupMode('CREATE')} className={`py-5 rounded-2xl font-black text-2xl shadow-md transition ${!user ? 'bg-slate-300 text-slate-500' : 'bg-orange-500 text-white hover:bg-orange-400 hover:-translate-y-1'}`}>
+                {user ? "創建遊戲房間" : "雲端連線中..."}
+              </button>
+              <button disabled={!user} onClick={() => setSetupMode('JOIN')} className="py-5 rounded-2xl font-black text-2xl bg-sky-500 text-white shadow-md hover:bg-sky-400 transition hover:-translate-y-1">
+                加入好友房間
+              </button>
+            </div>
+          )}
+
+          {/* --- 創建房間設定 --- */}
+          {setupMode === 'CREATE' && (
+            <div className="w-full flex flex-col items-center gap-6 animate-in fade-in slide-in-from-bottom-4">
+              
+              <div className="w-full">
+                <div className="text-center font-bold text-slate-500 mb-3 flex items-center justify-center gap-2"><UsersIcon size={18}/> 選擇玩家人數</div>
+                <div className="flex justify-center gap-3">
+                  {[2, 3, 4, 5, 6].map(num => (
+                    <button key={num} onClick={() => setSetupPlayerCount(num)} className={`w-12 h-12 rounded-full font-black text-xl transition-all ${setupPlayerCount === num ? 'bg-orange-500 text-white scale-110 shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="w-full border-t-2 border-slate-100"></div>
+
+              <div className="w-full">
+                <div className="text-center font-bold text-slate-500 mb-3 flex items-center justify-center gap-2"><Clock size={18}/> 設定遊戲時間</div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {[{l: '5 分鐘', v: 300}, {l: '10 分鐘', v: 600}, {l: '20 分鐘', v: 1200}, {l: '30 分鐘', v: 1800}, {l: '不限時', v: -1}].map(t => (
+                    <button key={t.v} onClick={() => setSetupTimeLimit(t.v)} className={`px-4 py-2 rounded-full font-bold transition-all border-2 ${setupTimeLimit === t.v ? 'bg-blue-500 border-blue-500 text-white shadow-md' : 'border-slate-200 text-slate-500 hover:border-blue-300'}`}>
+                      {t.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="w-full border-t-2 border-slate-100"></div>
+
+              <div className="w-full bg-orange-50 rounded-xl p-4">
+                <div className="text-center font-bold text-orange-800 mb-3">挑選你的專屬頭像</div>
+                <div className="flex flex-wrap justify-center gap-2 max-h-32 overflow-y-auto p-1">
+                  {CHILD_AVATARS.map(avatar => (
+                    <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-12 h-12 rounded-full text-3xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'ring-4 ring-orange-500 scale-110 shadow-lg' : 'hover:bg-orange-100 border border-orange-200'}`}>
+                      {avatar}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex w-full gap-3 mt-2">
+                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-4 font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition">返回</button>
+                <button onClick={handleCreateRoom} className="flex-[2] py-4 font-black text-white bg-red-600 rounded-xl shadow-lg hover:bg-red-500 transition text-xl">開始冒險</button>
+              </div>
+            </div>
+          )}
+
+          {/* --- 加入房間設定 --- */}
+          {setupMode === 'JOIN' && (
+            <div className="w-full flex flex-col items-center gap-6 animate-in fade-in slide-in-from-bottom-4">
+              <div className="w-full">
+                <div className="text-center font-bold text-slate-500 mb-2">請輸入房號</div>
+                <input 
+                  type="text" placeholder="例如：A1B2C3" 
+                  value={roomId} onChange={e => setRoomId(e.target.value.toUpperCase())} 
+                  className="w-full bg-slate-50 p-4 rounded-xl text-center text-3xl font-black border-2 border-slate-200 focus:border-sky-500 outline-none uppercase tracking-widest text-slate-700" 
+                />
+              </div>
+
+              <div className="w-full border-t-2 border-slate-100"></div>
+
+              <div className="w-full bg-sky-50 rounded-xl p-4">
+                <div className="text-center font-bold text-sky-800 mb-3">挑選你的專屬頭像</div>
+                <div className="flex flex-wrap justify-center gap-2 max-h-32 overflow-y-auto p-1">
+                  {CHILD_AVATARS.map(avatar => (
+                    <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-12 h-12 rounded-full text-3xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'ring-4 ring-sky-500 scale-110 shadow-lg' : 'hover:bg-sky-100 border border-sky-200'}`}>
+                      {avatar}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex w-full gap-3 mt-2">
+                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-4 font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition">返回</button>
+                <button disabled={roomId.length < 4} onClick={handleJoinRoom} className={`flex-[2] py-4 font-black text-white rounded-xl shadow-lg transition text-xl ${roomId.length < 4 ? 'bg-slate-300' : 'bg-sky-500 hover:bg-sky-400'}`}>加入冒險</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -394,20 +586,22 @@ export default function App() {
   const currentSquare = myPlayer ? BOARD_SQUARES[myPlayer.pos] : null;
 
   return (
-    <div className="h-screen w-screen bg-[#0a192f] overflow-hidden relative touch-none select-none">
+    <div className="h-screen w-screen bg-[#0a192f] overflow-hidden relative touch-none select-none font-sans">
       
-      {/* 🌟 完美復刻：頂部玩家儀表板 */}
+      {/* 🌟 頂部玩家儀表板 */}
       <div className="absolute top-4 left-4 right-20 z-50 flex gap-4 overflow-x-auto pb-4 px-2 pointer-events-auto items-center">
-        {/* 計時器 */}
         <div className="bg-slate-800 text-white rounded-full px-5 py-2 flex items-center justify-center gap-2 font-mono font-bold shadow-lg h-14 shrink-0 border-2 border-slate-700">
           <Timer size={18} className={gameData.timeLeft < 60 ? "text-red-400 animate-pulse" : "text-slate-300"}/> 
           {formatTime(gameData.timeLeft)}
         </div>
         
-        {/* 玩家卡片列表 */}
+        <div className="bg-[#fffbf0] text-slate-800 rounded-full px-5 py-2 flex items-center justify-center font-black shadow-lg h-14 shrink-0 border-2 border-yellow-400 tracking-wider">
+          房號: <span className="ml-1 text-blue-600">{roomId}</span>
+        </div>
+
         {gameData.players.map(p => (
           <div key={p.id} className={`flex items-center gap-3 px-4 py-2 rounded-2xl border-2 shadow-lg h-14 shrink-0 transition-all duration-300 ${gameData.currentPlayerIdx === p.id ? 'border-blue-500 bg-blue-50 scale-105' : 'border-slate-300 bg-white/90 opacity-80'}`}>
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xl shadow-sm ${p.color}`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-2xl shadow-sm bg-white border border-slate-200`}>
               {p.icon}
             </div>
             <div className="flex flex-col justify-center min-w-[80px]">
@@ -415,16 +609,20 @@ export default function App() {
                 <span>{p.name}</span>
                 {p.uid === user.uid && <span className="text-blue-500 ml-1">(你)</span>}
               </div>
-              <div className="flex gap-2 items-baseline leading-none">
-                <span className="text-sm font-black text-emerald-600">${p.money}</span>
-                <span className="text-[10px] font-bold text-yellow-600 flex items-center gap-0.5"><Star size={10} fill="currentColor"/> {p.trust}</span>
-              </div>
+              {p.uid !== null ? (
+                <div className="flex gap-2 items-baseline leading-none">
+                  <span className="text-sm font-black text-emerald-600">${p.money}</span>
+                  <span className="text-[10px] font-bold text-yellow-600 flex items-center gap-0.5"><Star size={10} fill="currentColor"/> {p.trust}</span>
+                </div>
+              ) : (
+                <span className="text-xs font-bold text-slate-400 italic">等待加入...</span>
+              )}
             </div>
           </div>
         ))}
       </div>
 
-      {/* 🌟 完美復刻：右側浮動控制列 */}
+      {/* 🌟 右側浮動控制列 */}
       <div className="absolute right-4 bottom-1/2 translate-y-1/2 flex flex-col gap-3 z-50 pointer-events-auto">
         <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="w-12 h-12 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors border border-slate-200">
           <ZoomIn size={24}/>
@@ -440,14 +638,14 @@ export default function App() {
         </button>
       </div>
 
-      {/* 顯示擲骰結果 */}
+      {/* 顯示骰出的點數 */}
       {gameData.gameState !== 'IDLE' && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-white/95 p-3 px-6 rounded-full shadow-2xl font-black text-2xl flex items-center gap-4 z-50 border-4 border-blue-500 animate-bounce">
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-white/95 p-3 px-6 rounded-full shadow-2xl font-black text-2xl flex items-center gap-4 z-50 border-4 border-blue-500">
           🎲 {gameData.diceVals[0]} + {gameData.diceVals[1]} = {gameData.diceVals[0] + gameData.diceVals[1]} 步
         </div>
       )}
 
-      {/* 地圖區域 */}
+      {/* 🌟 地圖區域 */}
       <div ref={mapRef} className="flex-grow relative w-full h-full cursor-grab active:cursor-grabbing overflow-hidden">
         <div 
           className="absolute top-0 left-0 origin-top-left transition-transform duration-700 ease-out pointer-events-none" 
@@ -456,7 +654,6 @@ export default function App() {
             transform: `translate(${cameraOffset.x + manualOffset.x}px, ${cameraOffset.y + manualOffset.y}px) scale(${displayZoom})` 
           }}
         >
-          {/* 🌟 完美復刻：棋盤背景與間距 */}
           <div 
             className="w-full h-full p-4 bg-[#c8e6c9] rounded-2xl shadow-2xl border-4 border-[#2e7d32]"
             style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gridTemplateRows: 'repeat(11, 1fr)', gap: '4px' }}
@@ -464,10 +661,9 @@ export default function App() {
             {BOARD_SQUARES.map((sq, idx) => {
               const {row, col} = GRID_ORDER[idx];
               const owner = gameData.players.find(p => gameData.properties?.[idx] === p.id);
-              const playersHere = gameData.players.filter(p => p.pos === idx);
               
-              // 🌟 完美復刻：文字方向排版
-              const isBottom = idx >= 1 && idx <= 9;
+              const activePlayersHere = gameData.players.filter(p => p.pos === idx && p.uid !== null);
+              
               const isLeft = idx >= 11 && idx <= 19;
               const isTop = idx >= 21 && idx <= 29;
               const isRight = idx >= 31 && idx <= 39;
@@ -478,28 +674,45 @@ export default function App() {
               else if (isRight) contentClass += " -rotate-90";
 
               return (
-                // 🌟 完美復刻：厚實的卡片樣式與咖啡色底線
                 <div key={idx} className="bg-[#fffdf5] rounded-md relative flex flex-col overflow-hidden shadow-sm" style={{ gridRow: row, gridColumn: col, borderBottom: '5px solid #4a3424', borderRight: '1px solid #dcd3cb', borderLeft: '1px solid #dcd3cb', borderTop: '1px solid #dcd3cb' }}>
                   
-                  {/* 土地顏色標籤 */}
                   {sq.type === 'PROPERTY' && (
                     <div className={`h-[25%] w-full ${owner ? getOwnerBgColor(owner.color) : sq.color} border-b border-black/10 z-0`}></div>
                   )}
 
                   <div className={contentClass}>
-                    <span className="font-black text-slate-800 text-[11px] leading-tight text-center">{sq.name}</span>
-                    {sq.price && <span className="text-blue-600 font-black text-[10px] leading-tight mt-0.5">${sq.price}</span>}
+                    <span className="font-black text-slate-800 text-lg leading-tight text-center">{sq.name}</span>
+                    {sq.price && <span className="text-blue-600 font-black text-base leading-tight mt-1">${sq.price}</span>}
                     {sq.reqTrust > 0 && (
-                      <div className="mt-1 bg-yellow-100 text-yellow-700 text-[8px] font-black px-1.5 py-0.5 rounded-full border border-yellow-300 flex items-center justify-center gap-0.5 shadow-sm">
-                        <Star size={8} fill="currentColor"/> {sq.reqTrust}
+                      <div className="mt-1.5 bg-yellow-100 text-yellow-700 text-xs font-black px-2 py-0.5 rounded-full border border-yellow-300 flex items-center justify-center gap-1 shadow-sm">
+                        <Star size={12} fill="currentColor"/> {sq.reqTrust}
                       </div>
                     )}
                   </div>
 
-                  {/* 玩家棋子 */}
+                  {/* 🌟 玩家棋子與動畫計步器 */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                    {playersHere.map((p, pIdx) => (
-                      <div key={p.id} className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xl shadow-xl transition-all duration-300 ${p.color} ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400' : 'z-10 opacity-90'}`} style={{ transform: `translate(${pIdx * 4}px, ${pIdx * 4}px)` }}>{p.icon}</div>
+                    {activePlayersHere.map((p, pIdx) => (
+                      <div key={p.id} className="relative transition-all duration-300 ease-linear" style={{ transform: `translate(${pIdx * 8}px, ${pIdx * 8}px)` }}>
+                        
+                        {/* 🌟 倒數計步器：只有在移動中且有剩餘步數時顯示 */}
+                        {gameData.gameState === 'MOVING' && gameData.currentPlayerIdx === p.id && gameData.remainingSteps > 0 && (
+                          <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-white border-2 border-blue-600 text-blue-600 font-black rounded-full w-6 h-6 flex items-center justify-center text-sm shadow-lg animate-bounce z-40">
+                            {gameData.remainingSteps}
+                          </div>
+                        )}
+
+                        {/* 🌟 靜心房祈禱標記 */}
+                        {p.inJail && (
+                          <div className="absolute -top-3 -right-3 text-xl animate-pulse drop-shadow-md z-40">
+                            🙏
+                          </div>
+                        )}
+
+                        <div className={`w-14 h-14 bg-white rounded-full border-[3px] border-slate-200 flex items-center justify-center text-3xl shadow-xl transition-all duration-300 ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400' : 'z-10 opacity-95'}`}>
+                          {p.icon}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -513,30 +726,57 @@ export default function App() {
       {gameData.currentPlayerIdx === myPlayerIndex && (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col gap-3 z-50 pointer-events-auto">
           
-          {/* 狀態 1：還沒擲骰子 */}
+          {/* 🌟 狀態 1：還沒行動 (判斷是正常擲骰還是靜心房擲杯) */}
           {gameData.gameState === 'IDLE' && (
-            <button onClick={handleRollDice} className="px-10 py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-3xl shadow-[0_10px_0_0_#1e3a8a,0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_#1e3a8a,0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-3 border-4 border-white animate-bounce">
-              <Dice5 size={32} /> 擲骰子
-            </button>
+            <>
+              {myPlayer?.inJail ? (
+                // 靜心房專用擲杯按鈕
+                <div className="flex flex-col items-center gap-2">
+                  <div className="bg-slate-800 text-white font-bold px-4 py-2 rounded-xl shadow-lg border-2 border-slate-700 text-sm animate-pulse mb-1">
+                    你在靜心房反省中...
+                  </div>
+                  <button onClick={handleBwaBwei} className="px-10 py-5 bg-red-600 hover:bg-red-500 text-white rounded-full font-black text-3xl shadow-[0_10px_0_0_#991b1b,0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_#991b1b,0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-3 border-4 border-white animate-bounce">
+                    🙏 擲杯請示神明
+                  </button>
+                </div>
+              ) : (
+                // 正常擲骰子按鈕
+                <div className="flex flex-col items-center gap-2">
+                  {gameData.actionMessage && <div className="bg-white/90 text-slate-800 font-bold px-4 py-2 rounded-xl shadow-lg border-2 border-slate-300 text-sm mb-1 text-center whitespace-pre-line">{gameData.actionMessage}</div>}
+                  <button onClick={handleRollDice} className="px-10 py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-3xl shadow-[0_10px_0_0_#1e3a8a,0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_#1e3a8a,0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-3 border-4 border-white animate-bounce">
+                    <Dice5 size={32} /> 擲骰子
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
-          {/* 狀態 2 & 3：行動階段與結束確認 */}
+          {/* 🌟 狀態 2 & 3：行動階段與結束確認 */}
           {(gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && (
-            <div className="bg-white p-6 rounded-3xl shadow-2xl flex flex-col gap-4 border-4 border-slate-800 min-w-[280px]">
+            <div className="bg-white p-6 rounded-3xl shadow-2xl flex flex-col gap-4 border-4 border-slate-800 min-w-[300px]">
               {gameData.actionMessage.split('\n').map((line, i) => (
                 <div key={i} className="font-black text-center text-slate-800 text-lg leading-snug">{line}</div>
               ))}
               
               <div className="border-t-2 border-slate-100 my-1"></div>
 
-              {/* 購買按鈕 */}
+              {/* 🌟 購買按鈕 (加入信用點數嚴格判斷與提示) */}
               {gameData.gameState === 'ACTION' && currentSquare?.type === 'PROPERTY' && !gameData.properties[myPlayer.pos] && (
                 <button 
                   onClick={handleBuyProperty} 
                   disabled={myPlayer.money < currentSquare.price || myPlayer.trust < currentSquare.reqTrust}
-                  className={`font-black py-4 px-6 rounded-2xl active:scale-95 transition-transform text-lg ${myPlayer.money >= currentSquare.price && myPlayer.trust >= currentSquare.reqTrust ? 'bg-green-500 hover:bg-green-400 text-white shadow-lg' : 'bg-slate-200 text-slate-400'}`}
+                  className={`font-black py-4 px-6 rounded-2xl active:scale-95 transition-transform text-lg flex flex-col items-center justify-center 
+                    ${myPlayer.money >= currentSquare.price && myPlayer.trust >= currentSquare.reqTrust 
+                      ? 'bg-green-500 hover:bg-green-400 text-white shadow-lg' 
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                 >
-                  {myPlayer.trust < currentSquare.reqTrust ? `信用不足 (需 ${currentSquare.reqTrust})` : `購買土地 ($${currentSquare.price})`}
+                  {myPlayer.money < currentSquare.price ? (
+                    <span>資金不足 ($${currentSquare.price})</span>
+                  ) : myPlayer.trust < currentSquare.reqTrust ? (
+                    <span className="flex items-center gap-1">信用不足 (缺 {currentSquare.reqTrust - myPlayer.trust} 點 <Star size={16} fill="currentColor"/>)</span>
+                  ) : (
+                    <span>購買土地 ($${currentSquare.price})</span>
+                  )}
                 </button>
               )}
               
