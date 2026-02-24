@@ -310,7 +310,7 @@ export default function App() {
             transform: `translate(${cameraOffset.x + manualOffset.x}px, ${cameraOffset.y + manualOffset.y}px) scale(${displayZoom})` 
           }}
         >
-          <div className="grid grid-cols-11 grid-rows-11 w-full h-full gap-1 p-2 bg-slate-300 rounded-lg shadow-inner">
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gridTemplateRows: 'repeat(11, 1fr)' }}
             {BOARD_SQUARES.map((sq, idx) => {
               const {row, col} = GRID_ORDER[idx];
               const owner = gameData.players.find(p => gameData.properties?.[idx] === p.id);
