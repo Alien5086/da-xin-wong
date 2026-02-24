@@ -174,10 +174,8 @@ export default function App() {
     const initAuth = async (retries = 3) => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          // 在預覽環境中使用自訂權杖
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
-          // 檢查使用者是否忘記填寫真實金鑰
           if (firebaseConfig.apiKey.includes("請在這裡填入")) {
             throw new Error("INVALID_KEY");
           }
@@ -189,7 +187,7 @@ export default function App() {
         if (e.message === "INVALID_KEY") {
           setErrorMsg("部署前，請務必在 App.jsx 填入您真實的 Firebase API_KEY！");
         } else if (retries > 0) {
-          setTimeout(() => initAuth(retries - 1), 1500); // 失敗重試
+          setTimeout(() => initAuth(retries - 1), 1500); 
         } else {
           setErrorMsg("網路連線失敗，請檢查金鑰或關閉廣告阻擋器 (AdBlock)。");
         }
@@ -310,7 +308,11 @@ export default function App() {
             transform: `translate(${cameraOffset.x + manualOffset.x}px, ${cameraOffset.y + manualOffset.y}px) scale(${displayZoom})` 
           }}
         >
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gridTemplateRows: 'repeat(11, 1fr)' }}
+          {/* ✅ 這裡已經修復了地圖排版的 CSS 問題，並確保語法正確 */}
+          <div 
+            className="w-full h-full gap-1 p-2 bg-slate-300 rounded-lg shadow-inner"
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gridTemplateRows: 'repeat(11, 1fr)' }}
+          >
             {BOARD_SQUARES.map((sq, idx) => {
               const {row, col} = GRID_ORDER[idx];
               const owner = gameData.players.find(p => gameData.properties?.[idx] === p.id);
