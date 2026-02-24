@@ -79,9 +79,8 @@ const firebaseConfig = {
   storageBucket: "da-xin-wong.firebasestorage.app",
   messagingSenderId: "72871979370",
   appId: "1:72871979370:web:97caab1074d5f1e8f9dd13"
+  };
 };
-};
-
 const firebaseConfig = getFirebaseConfig();
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -109,7 +108,6 @@ const getOwnerBgColor = (colorClass) => {
 
 // --- 4. 主程式組件 ---
 export default function App() {
-  // 基礎狀態
   const [appPhase, setAppPhase] = useState('LANDING'); 
   const [user, setUser] = useState(null);
   const [roomId, setRoomId] = useState("");
@@ -117,7 +115,6 @@ export default function App() {
   const [myPlayerIndex, setMyPlayerIndex] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  // 遊戲雲端資料同步
   const [gameData, setGameData] = useState({
     players: [],
     currentPlayerIdx: 0,
@@ -128,7 +125,6 @@ export default function App() {
     remainingSteps: 0
   });
 
-  // UI 交互狀態
   const [zoom, setZoom] = useState(0.8);
   const [cameraOffset, setCameraOffset] = useState({ x: 0, y: 0 });
   const [manualOffset, setManualOffset] = useState({ x: 0, y: 0 });
@@ -137,30 +133,44 @@ export default function App() {
     h: typeof window !== 'undefined' ? window.innerHeight : 600 
   });
   const [isFullMapMode, setIsFullMapMode] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   const MAP_SIZE = 1600;
+  const mapContainerRef = useRef(null);
+  const dragRef = useRef({ isDragging: false, startX: 0, startY: 0, currentX: 0, currentY: 0 });
 
-  // 使用 useCallback 封裝，解決 ReferenceError 問題
-  const handlePointerDown = useCallback((e) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - manualOffset.x, y: e.clientY - manualOffset.y });
-  }, [manualOffset]);
+  // --- 重點：使用 Ref 和原生監聽器徹底修復 ReferenceError ---
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container) return;
 
-  const handlePointerMove = useCallback((e) => {
-    if (!isDragging) return;
-    setManualOffset({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y
-    });
-  }, [isDragging, dragStart]);
+    const onDown = (e) => {
+      dragRef.current.isDragging = true;
+      dragRef.current.startX = e.clientX - manualOffset.x;
+      dragRef.current.startY = e.clientY - manualOffset.y;
+    };
 
-  const handlePointerUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
+    const onMove = (e) => {
+      if (!dragRef.current.isDragging) return;
+      const newX = e.clientX - dragRef.current.startX;
+      const newY = e.clientY - dragRef.current.startY;
+      setManualOffset({ x: newX, y: newY });
+    };
 
-  // 監聽視窗縮放
+    const onUp = () => {
+      dragRef.current.isDragging = false;
+    };
+
+    container.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+
+    return () => {
+      container.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [manualOffset]); // 依賴 manualOffset 確保位置計算最新
+
   useEffect(() => {
     const handleResize = () => {
       setViewportSize({ w: window.innerWidth, h: window.innerHeight });
@@ -169,7 +179,7 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // --- 初始化 Firebase Auth ---
+  // --- Firebase 邏輯 ---
   useEffect(() => {
     const initAuth = async (retries = 3) => {
       try {
@@ -180,13 +190,12 @@ export default function App() {
         }
         setErrorMsg(null);
       } catch (e) {
-        console.error("Auth Error:", e);
-        if (e.message?.includes('blocked-by-client') || e.code === 'auth/network-request-failed') {
-          setErrorMsg("連線被瀏覽器攔截！請暫時關閉 AdBlock 或廣告阻擋器後重新整理。");
+        if (e.message?.includes('blocked') || e.code?.includes('network')) {
+          setErrorMsg("連線被阻擋！請關閉廣告阻擋器 (AdBlock) 後重新整理。");
         } else if (retries > 0) {
           setTimeout(() => initAuth(retries - 1), 1000);
         } else {
-          setErrorMsg("連線至雲端伺服器失敗，請檢查網路。");
+          setErrorMsg("雲端連線失敗。");
         }
       }
     };
@@ -195,27 +204,18 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- 監聽雲端資料 ---
   useEffect(() => {
     if (!user || !roomId || appPhase !== 'GAME') return;
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-    const unsubscribe = onSnapshot(roomRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setGameData(docSnap.data());
-      }
-    }, (err) => {
-      console.error("Sync Error:", err);
+    return onSnapshot(roomRef, (docSnap) => {
+      if (docSnap.exists()) setGameData(docSnap.data());
     });
-    return () => unsubscribe();
   }, [user, roomId, appPhase]);
 
-  // --- 相機追蹤邏輯 ---
   const displayZoom = isFullMapMode ? Math.min(viewportSize.w / MAP_SIZE, viewportSize.h / MAP_SIZE) * 0.7 : zoom;
   
   useEffect(() => {
-    if (appPhase !== 'GAME') return;
-    const currP = gameData.players[gameData.currentPlayerIdx];
-    if (!currP || isFullMapMode) {
+    if (appPhase !== 'GAME' || isFullMapMode) {
       if (isFullMapMode) {
         setCameraOffset({ 
           x: viewportSize.w / 2 - (MAP_SIZE / 2) * displayZoom, 
@@ -224,19 +224,17 @@ export default function App() {
       }
       return;
     }
+    const currP = gameData.players[gameData.currentPlayerIdx];
+    if (!currP) return;
 
     const { row, col } = GRID_ORDER[currP.pos];
     const CELL_SIZE = MAP_SIZE / 11;
-    const targetX = (col - 1) * CELL_SIZE + CELL_SIZE / 2;
-    const targetY = (row - 1) * CELL_SIZE + CELL_SIZE / 2;
-    
     setCameraOffset({ 
-      x: viewportSize.w / 2 - targetX * displayZoom, 
-      y: viewportSize.h / 2 - targetY * displayZoom 
+      x: viewportSize.w / 2 - ((col - 1) * CELL_SIZE + CELL_SIZE / 2) * displayZoom, 
+      y: viewportSize.h / 2 - ((row - 1) * CELL_SIZE + CELL_SIZE / 2) * displayZoom 
     });
   }, [gameData.currentPlayerIdx, isFullMapMode, displayZoom, viewportSize, appPhase]);
 
-  // --- 房間操作 ---
   const createRoom = async (count) => {
     if (!user) return;
     const id = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -249,22 +247,12 @@ export default function App() {
       money: BASE_MONEY,
       uid: i === 0 ? user.uid : null
     }));
-
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
-        players,
-        currentPlayerIdx: 0,
-        gameState: 'IDLE',
-        roomId: id,
-        timeLeft: 600
+        players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: 600
       });
-      setRoomId(id);
-      setIsHost(true);
-      setMyPlayerIndex(0);
-      setAppPhase('GAME');
-    } catch (e) {
-      setErrorMsg("建立房間失敗，請確認 Firebase 設定。");
-    }
+      setRoomId(id); setIsHost(true); setMyPlayerIndex(0); setAppPhase('GAME');
+    } catch (e) { setErrorMsg("建立失敗。"); }
   };
 
   const joinRoom = async (id) => {
@@ -272,87 +260,53 @@ export default function App() {
     try {
       const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id);
       const snap = await getDoc(roomRef);
-      if (!snap.exists()) {
-        setErrorMsg("找不到該房號！");
-        return;
-      }
+      if (!snap.exists()) { setErrorMsg("找不到房號！"); return; }
       const data = snap.data();
       const slot = data.players.findIndex(p => p.uid === null);
-      if (slot === -1) {
-        setErrorMsg("房間已滿！");
-        return;
-      }
+      if (slot === -1) { setErrorMsg("滿了！"); return; }
       data.players[slot].uid = user.uid;
       await updateDoc(roomRef, { players: data.players });
-      setRoomId(id);
-      setMyPlayerIndex(slot);
-      setAppPhase('GAME');
-    } catch (e) {
-      setErrorMsg("加入房間失敗。");
-    }
+      setRoomId(id); setMyPlayerIndex(slot); setAppPhase('GAME');
+    } catch (e) { setErrorMsg("加入失敗。"); }
   };
 
-  // --- 渲染 Landing 頁面 ---
   if (appPhase === 'LANDING') {
     return (
       <div className="h-screen w-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
         <Smartphone size={80} className="text-blue-400 mb-4 animate-bounce" />
         <h1 className="text-4xl font-black mb-2">大信翁多人連線</h1>
-        <p className="text-slate-400 mb-8 font-bold text-sm">手機遙控・即時同步</p>
-        
-        {errorMsg && (
-          <div className="mb-6 bg-red-500/20 border border-red-500/50 p-4 rounded-xl text-red-200 flex flex-col items-center gap-2">
-            <div className="flex items-center gap-3">
-              <AlertCircle size={20} />
-              <span className="text-sm font-bold">{errorMsg}</span>
-            </div>
-            {errorMsg.includes('阻擋') && (
-              <button onClick={() => window.location.reload()} className="mt-2 text-xs bg-red-600 px-3 py-1 rounded-full hover:bg-red-500">點此重整</button>
-            )}
-          </div>
-        )}
-
+        <p className="text-slate-400 mb-8 font-bold text-sm">手機連線・最終修復版</p>
+        {errorMsg && <div className="mb-6 bg-red-600/30 p-4 rounded-xl border border-red-500 text-sm font-bold">{errorMsg}</div>}
         <div className="flex flex-col gap-4 w-full max-w-xs">
-          <button disabled={!user} onClick={() => createRoom(4)} className={`py-4 rounded-2xl font-black text-xl shadow-xl transition active:scale-95 ${!user ? 'bg-slate-700 opacity-50' : 'bg-blue-600 hover:bg-blue-500'}`}>
-            {user ? "我要開房間" : "正在建立連線..."}
-          </button>
-          <div className="relative flex items-center py-2"><div className="flex-grow border-t border-slate-700"></div><span className="px-3 text-slate-500 text-xs font-bold uppercase">或</span><div className="flex-grow border-t border-slate-700"></div></div>
-          <input type="text" placeholder="輸入 6 位房號" value={roomId} onChange={e => setRoomId(e.target.value.toUpperCase())} className="bg-slate-800 p-4 rounded-xl text-center text-xl font-bold border-2 border-slate-700 focus:border-blue-500 outline-none" />
-          <button disabled={!user || roomId.length < 4} onClick={() => joinRoom(roomId)} className={`py-4 rounded-2xl font-black text-xl transition active:scale-95 ${(!user || roomId.length < 4) ? 'bg-slate-700 text-slate-500' : 'bg-white text-slate-900 hover:bg-slate-100'}`}>加入遊戲</button>
+          <button disabled={!user} onClick={() => createRoom(4)} className={`py-4 rounded-2xl font-black text-xl shadow-xl transition ${!user ? 'bg-slate-700' : 'bg-blue-600'}`}>{user ? "我要開房間" : "連線中..."}</button>
+          <input type="text" placeholder="房號" value={roomId} onChange={e => setRoomId(e.target.value.toUpperCase())} className="bg-slate-800 p-4 rounded-xl text-center text-xl font-bold border-2 border-slate-700" />
+          <button disabled={!user || roomId.length < 4} onClick={() => joinRoom(roomId)} className="py-4 rounded-2xl font-black text-xl bg-white text-slate-900">加入遊戲</button>
         </div>
       </div>
     );
   }
 
-  // --- 渲染遊戲頁面 ---
   return (
-    <div className="h-screen w-screen bg-slate-950 overflow-hidden relative touch-none">
-      <div className="bg-white/95 backdrop-blur-md p-2 flex justify-between items-center z-50 relative border-b-2 border-slate-800">
-        <div className="font-black px-3 py-1 bg-slate-900 text-white rounded-lg shadow-sm">房號: {roomId}</div>
-        <div className="font-mono font-bold text-lg bg-slate-100 px-4 py-1 rounded-full flex items-center gap-2 border border-slate-200">
-          <Timer size={18} className={gameData.timeLeft < 60 ? "text-red-500 animate-pulse" : "text-slate-600"}/> 
-          {formatTime(gameData.timeLeft)}
+    <div className="h-screen w-screen bg-slate-950 overflow-hidden relative touch-none select-none">
+      <div className="bg-white/95 backdrop-blur p-2 flex justify-between items-center z-50 relative border-b-2 border-slate-800">
+        <div className="font-black px-3 py-1 bg-slate-900 text-white rounded-lg">房號: {roomId}</div>
+        <div className="font-mono font-bold text-lg bg-slate-100 px-4 py-1 rounded-full flex items-center gap-2">
+          <Timer size={18} className={gameData.timeLeft < 60 ? "text-red-500 animate-pulse" : "text-slate-600"}/> {formatTime(gameData.timeLeft)}
         </div>
-        <button onClick={() => { setIsFullMapMode(!isFullMapMode); setManualOffset({x:0, y:0}); }} className={`p-2 rounded-lg transition-colors ${isFullMapMode ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
+        <button onClick={() => { setIsFullMapMode(!isFullMapMode); setManualOffset({x:0, y:0}); }} className="p-2 bg-slate-200 rounded-lg">
           {isFullMapMode ? <LocateFixed size={20}/> : <Map size={20}/>}
         </button>
       </div>
 
-      <div 
-        className="flex-grow relative w-full h-full cursor-grab active:cursor-grabbing" 
-        onPointerDown={handlePointerDown} 
-        onPointerMove={handlePointerMove} 
-        onPointerUp={handlePointerUp}
-      >
+      <div ref={mapContainerRef} className="flex-grow relative w-full h-full cursor-grab active:cursor-grabbing overflow-hidden">
         <div 
           className="absolute top-0 left-0 origin-top-left transition-transform duration-700 ease-out" 
           style={{ 
-            width: `${MAP_SIZE}px`, 
-            height: `${MAP_SIZE}px`, 
+            width: `${MAP_SIZE}px`, height: `${MAP_SIZE}px`, 
             transform: `translate(${cameraOffset.x + manualOffset.x}px, ${cameraOffset.y + manualOffset.y}px) scale(${displayZoom})` 
           }}
         >
-          <div className="grid grid-cols-11 grid-rows-11 w-full h-full gap-1 p-2 bg-slate-300 rounded-lg shadow-inner">
+          <div className="grid grid-cols-11 grid-rows-11 w-full h-full gap-1 p-2 bg-slate-300 rounded-lg">
             {BOARD_SQUARES.map((sq, idx) => {
               const {row, col} = GRID_ORDER[idx];
               const owner = gameData.players.find(p => gameData.properties?.[idx] === p.id);
@@ -365,7 +319,7 @@ export default function App() {
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     {playersHere.map((p, pIdx) => (
-                      <div key={p.id} className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xl shadow-xl transition-all duration-300 ${p.color} ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400' : 'z-10 opacity-90'}`} style={{ transform: `translate(${pIdx * 4}px, ${pIdx * 4}px)` }}>{p.icon}</div>
+                      <div key={p.id} className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xl shadow-xl ${p.color} ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400' : 'z-10 opacity-90'}`} style={{ transform: `translate(${pIdx * 4}px, ${pIdx * 4}px)` }}>{p.icon}</div>
                     ))}
                   </div>
                 </div>
@@ -375,20 +329,16 @@ export default function App() {
         </div>
       </div>
 
-      <div className="fixed bottom-6 left-6 bg-slate-900/90 backdrop-blur-lg text-white p-4 rounded-3xl border border-white/20 flex items-center gap-4 z-50 shadow-2xl">
+      <div className="fixed bottom-6 left-6 bg-slate-900/90 text-white p-4 rounded-3xl border border-white/20 flex items-center gap-4 z-50 shadow-2xl">
         <div className={`w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-inner ${gameData.players[myPlayerIndex]?.color || 'bg-slate-700'}`}>{gameData.players[myPlayerIndex]?.icon || '❓'}</div>
         <div>
-          <div className="text-[10px] font-black text-blue-400 tracking-widest uppercase mb-0.5">我的錢包</div>
-          <div className="text-2xl font-black tabular-nums">${gameData.players[myPlayerIndex]?.money || 0}</div>
+          <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest">我的錢包</div>
+          <div className="text-2xl font-black">${gameData.players[myPlayerIndex]?.money || 0}</div>
         </div>
       </div>
 
       {gameData.currentPlayerIdx === myPlayerIndex && gameData.gameState === 'IDLE' && (
         <button className="fixed bottom-6 right-6 w-28 h-28 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-2xl shadow-2xl animate-bounce z-50 border-8 border-white active:scale-90 transition-transform flex items-center justify-center text-center">擲骰</button>
-      )}
-
-      {errorMsg && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-red-600 text-white px-6 py-3 rounded-full font-bold shadow-2xl animate-pulse flex items-center gap-2"><AlertCircle size={20} /> {errorMsg}</div>
       )}
     </div>
   );
