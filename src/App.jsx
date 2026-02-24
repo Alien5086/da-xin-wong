@@ -157,6 +157,11 @@ export default function App() {
   const [myPlayerIndex, setMyPlayerIndex] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
 
+  // 🌟 新增：單機模式與音效狀態
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+
   const [gameData, setGameData] = useState({
     players: [], currentPlayerIdx: 0, properties: {},
     gameState: 'IDLE', timeLeft: 0, diceVals: [1, 1], actionMessage: '',
@@ -164,8 +169,8 @@ export default function App() {
   });
 
   const [displayDice, setDisplayDice] = useState([1, 1]);
-  const [showAssetManager, setShowAssetManager] = useState(false); // 資產管理面板
-  const [localTimeLeft, setLocalTimeLeft] = useState(0); // 本地倒數計時
+  const [showAssetManager, setShowAssetManager] = useState(false); 
+  const [localTimeLeft, setLocalTimeLeft] = useState(0); 
 
   const [zoom, setZoom] = useState(0.8);
   const [cameraOffset, setCameraOffset] = useState({ x: 0, y: 0 });
@@ -176,6 +181,20 @@ export default function App() {
   const dragStatus = useRef({ isDragging: false, startX: 0, startY: 0 });
   const mapRef = useRef(null);
   const MAP_SIZE = 1600;
+
+  // 🌟 新增：計算當前實際操作的玩家 (單機模式為當前回合玩家，連線模式為本人)
+  const activePlayerIndex = isOfflineMode ? gameData.currentPlayerIdx : myPlayerIndex;
+
+  // 🌟 新增：統一的資料同步引擎 (自動判斷要寫入雲端還是本地更新)
+  const syncGameData = async (updates) => {
+    if (isOfflineMode) {
+        setGameData(prev => ({ ...prev, ...updates }));
+    } else {
+        try {
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), updates);
+        } catch (e) { console.error("Sync error", e); }
+    }
+  };
 
   // --- 手動地圖拖曳 ---
   useEffect(() => {
@@ -229,7 +248,7 @@ export default function App() {
         setErrorMsg(null);
       } catch (e) {
         if (e.message === "INVALID_KEY") {
-          setErrorMsg("請在 App.jsx 填入您真實的 Firebase API_KEY！");
+          setErrorMsg("請在 App.jsx 填入您真實的 Firebase API_KEY！(單機模式可忽略此警告)");
         } else if (retries > 0) {
           setTimeout(() => initAuth(retries - 1), 1500); 
         } else {
@@ -242,9 +261,9 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- 監聽房間資料 ---
+  // --- 監聽房間資料 (連線模式專用) ---
   useEffect(() => {
-    if (!user || !roomId || appPhase !== 'GAME') return;
+    if (isOfflineMode || !user || !roomId || appPhase !== 'GAME') return;
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
     return onSnapshot(roomRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -255,16 +274,16 @@ export default function App() {
         }
       }
     });
-  }, [user, roomId, appPhase]);
+  }, [user, roomId, appPhase, isOfflineMode, localTimeLeft]);
 
-  // --- 本地遊戲倒數計時器 ---
+  // --- 遊戲倒數計時器 (單機與連線共用) ---
   useEffect(() => {
     if (appPhase !== 'GAME' || gameData.timeLeft === -1 || gameData.gameState === 'GAME_OVER') return;
     const timer = setInterval(() => {
         setLocalTimeLeft(prev => {
             if (prev <= 1) {
-                if (isHost && gameData.gameState !== 'GAME_OVER') {
-                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), { gameState: 'GAME_OVER' });
+                if ((isHost || isOfflineMode) && gameData.gameState !== 'GAME_OVER') {
+                    syncGameData({ gameState: 'GAME_OVER' });
                 }
                 return 0;
             }
@@ -272,7 +291,7 @@ export default function App() {
         });
     }, 1000);
     return () => clearInterval(timer);
-  }, [appPhase, gameData.timeLeft, gameData.gameState, isHost, roomId]);
+  }, [appPhase, gameData.timeLeft, gameData.gameState, isHost, isOfflineMode]);
 
 
   // --- 對焦與視角跟隨 ---
@@ -307,9 +326,31 @@ export default function App() {
     focusOnCurrentPlayer();
   }, [gameData.currentPlayerIdx, gameData.players[gameData.currentPlayerIdx]?.pos, isFullMapMode, displayZoom, viewportSize, appPhase, focusOnCurrentPlayer]);
 
-  // --- 房間創建邏輯 ---
+  // --- 🌟 啟動單機模式 ---
+  const handleStartLocalGame = async () => {
+    setIsOfflineMode(true);
+    const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
+      id: i, 
+      name: `玩家 ${i + 1}`, 
+      icon: CHILD_AVATARS[i % CHILD_AVATARS.length], 
+      color: ['bg-blue-500', 'bg-red-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'][i % 6],
+      pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
+      inJail: false, jailRoundsLeft: 0, isBankrupt: false,
+      uid: `local_player_${i}` // 賦予虛擬 ID 避免顯示「等待加入」
+    }));
+    
+    setGameData({
+      players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: 'LOCAL', timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0, diceVals: [1, 1]
+    });
+    setRoomId('單機同樂');
+    setAppPhase('GAME'); 
+    setLocalTimeLeft(setupTimeLimit);
+  };
+
+  // --- 房間創建邏輯 (線上) ---
   const handleCreateRoom = async () => {
     if (!user) return;
+    setIsOfflineMode(false);
     const id = Math.random().toString(36).substring(2, 8).toUpperCase();
     const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
       id: i, 
@@ -321,7 +362,6 @@ export default function App() {
       uid: i === 0 ? user.uid : null 
     }));
     try {
-      // 🌟 確保初始建立房間時就有給予 diceVals，防崩潰重點
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
         players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0, diceVals: [1, 1]
       });
@@ -331,6 +371,7 @@ export default function App() {
 
   const handleJoinRoom = async () => {
     if (!user || roomId.length < 4) return;
+    setIsOfflineMode(false);
     try {
       const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
       const snap = await getDoc(roomRef);
@@ -377,20 +418,18 @@ export default function App() {
 
   // 1. 擲骰子
   const handleRollDice = async () => {
-    if (gameData.currentPlayerIdx !== myPlayerIndex) return;
+    if (gameData.currentPlayerIdx !== activePlayerIndex) return;
 
     const d1 = Math.floor(Math.random() * 6) + 1;
     const d2 = Math.floor(Math.random() * 6) + 1;
     const steps = d1 + d2;
 
-    try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
-        diceVals: [d1, d2],
-        remainingSteps: steps,
-        gameState: 'ROLLING', 
-        actionMessage: ''
-      });
-    } catch (e) { console.error("Roll dice error", e); }
+    await syncGameData({
+      diceVals: [d1, d2],
+      remainingSteps: steps,
+      gameState: 'ROLLING', 
+      actionMessage: ''
+    });
   };
 
   // 動畫骰子切換
@@ -401,7 +440,6 @@ export default function App() {
       }, 100);
       return () => clearInterval(interval);
     } else {
-      // 🌟 安全取值防崩潰
       setDisplayDice(gameData.diceVals || [1, 1]);
     }
   }, [gameData.gameState, gameData.diceVals]);
@@ -409,25 +447,23 @@ export default function App() {
   // 動畫結束，開始移動
   useEffect(() => {
     if (appPhase !== 'GAME') return;
-    if (gameData.gameState === 'ROLLING' && gameData.currentPlayerIdx === myPlayerIndex) {
+    if (gameData.gameState === 'ROLLING' && gameData.currentPlayerIdx === activePlayerIndex) {
       const timer = setTimeout(async () => {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
-          gameState: 'MOVING'
-        });
+        await syncGameData({ gameState: 'MOVING' });
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [gameData.gameState, gameData.currentPlayerIdx, myPlayerIndex, roomId]);
+  }, [gameData.gameState, gameData.currentPlayerIdx, activePlayerIndex, roomId, isOfflineMode]);
 
   // 3. 移動動畫引擎
   useEffect(() => {
     if (appPhase !== 'GAME') return;
     if (gameData.gameState !== 'MOVING') return;
-    if (gameData.currentPlayerIdx !== myPlayerIndex) return;
+    if (gameData.currentPlayerIdx !== activePlayerIndex) return;
 
     const moveTimer = setTimeout(async () => {
       try {
-        const player = gameData.players[myPlayerIndex];
+        const player = gameData.players[activePlayerIndex];
         
         if (gameData.remainingSteps > 0) {
           const targetPos = player.pos + 1;
@@ -435,16 +471,15 @@ export default function App() {
           let newMoney = player.money;
           let msg = gameData.actionMessage || '';
           
-          // 經過起點領 $500，停在起點不領錢 (在 handleLandOnSquare 處理)
           if (newPos === 0 && gameData.remainingSteps > 1) {
             newMoney += 500;
             msg = '經過起點，獲得 $500！\n';
           }
           
           const newPlayers = [...gameData.players];
-          newPlayers[myPlayerIndex] = { ...player, pos: newPos, money: newMoney };
+          newPlayers[activePlayerIndex] = { ...player, pos: newPos, money: newMoney };
 
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+          await syncGameData({
             players: newPlayers,
             remainingSteps: gameData.remainingSteps - 1,
             actionMessage: msg
@@ -458,11 +493,11 @@ export default function App() {
     }, 350);
 
     return () => clearTimeout(moveTimer);
-  }, [gameData.gameState, gameData.remainingSteps, gameData.currentPlayerIdx, myPlayerIndex]);
+  }, [gameData.gameState, gameData.remainingSteps, gameData.currentPlayerIdx, activePlayerIndex, isOfflineMode]);
 
   // 4. 觸發降落格子的事件
   const handleLandOnSquare = async () => {
-    const player = gameData.players[myPlayerIndex];
+    const player = gameData.players[activePlayerIndex];
     const sq = BOARD_SQUARES[player.pos];
     let nextState = 'ACTION';
     let msg = gameData.actionMessage || '';
@@ -472,7 +507,7 @@ export default function App() {
       msg += `停在起點，無法領取零用錢。`;
       nextState = 'END_TURN';
     } else if (sq.type === 'TAX') {
-      newPlayers[myPlayerIndex].money -= sq.amount;
+      newPlayers[activePlayerIndex].money -= sq.amount;
       msg += `繳納${sq.name} $${sq.amount}。`;
       nextState = 'END_TURN';
     } else if (sq.type === 'CHANCE_GOOD' || sq.type === 'CHANCE_BAD') {
@@ -481,29 +516,28 @@ export default function App() {
       
       msg += `抽中卡片：【${card.desc}】\n`;
       if (card.goToJail) {
-         newPlayers[myPlayerIndex].pos = 10;
-         newPlayers[myPlayerIndex].inJail = true;
-         newPlayers[myPlayerIndex].jailRoundsLeft = -1; // -1 表示剛進去，需要擲杯
-         msg += `直接被送進靜心房反省！`;
+         newPlayers[activePlayerIndex].pos = 10;
+         newPlayers[activePlayerIndex].inJail = true;
+         msg += `直接被送進靜心房反省！\n請馬上進行擲杯請示神明！`;
+         nextState = 'JAIL_BWA_BWEI'; 
       } else {
-         newPlayers[myPlayerIndex].money += card.effectM;
-         newPlayers[myPlayerIndex].trust += card.effectT;
+         newPlayers[activePlayerIndex].money += card.effectM;
+         newPlayers[activePlayerIndex].trust += card.effectT;
          msg += `金錢 ${card.effectM > 0 ? '+'+card.effectM : card.effectM}，信用 ${card.effectT > 0 ? '+'+card.effectT : card.effectT}。`;
       }
-      nextState = 'END_TURN';
+      if (!card.goToJail) nextState = 'END_TURN';
     } else if (sq.type === 'GO_TO_JAIL' || sq.id === 30 || sq.type === 'JAIL' || sq.id === 10) {
-      newPlayers[myPlayerIndex].pos = 10;
-      newPlayers[myPlayerIndex].inJail = true;
-      newPlayers[myPlayerIndex].jailRoundsLeft = -1; 
-      msg += `進入靜心房反省！\n(下次輪到你需擲杯請示才能離開)`;
-      nextState = 'END_TURN';
+      newPlayers[activePlayerIndex].pos = 10;
+      newPlayers[activePlayerIndex].inJail = true;
+      msg += `進入靜心房反省！\n請馬上進行擲杯請示神明！`;
+      nextState = 'JAIL_BWA_BWEI'; 
     } else if (sq.type === 'PROPERTY') {
       const ownerId = gameData.properties?.[sq.id];
-      if (ownerId !== undefined && ownerId !== myPlayerIndex) {
+      if (ownerId !== undefined && ownerId !== activePlayerIndex) {
         const owner = newPlayers[ownerId];
-        if (!owner.inJail && !owner.isBankrupt) { // 坐牢收不到租金
+        if (!owner.inJail && !owner.isBankrupt) { 
            const rent = Math.floor(sq.price * 0.4);
-           newPlayers[myPlayerIndex].money -= rent;
+           newPlayers[activePlayerIndex].money -= rent;
            newPlayers[ownerId].money += rent;
            msg += `踩到 ${owner.name} 的地盤，支付過路費 $${rent}。`;
         } else {
@@ -522,61 +556,50 @@ export default function App() {
     }
 
     const bankruptCheck = checkBankruptcy(newPlayers);
-    if (bankruptCheck.changed && bankruptCheck.newPlayers[myPlayerIndex].isBankrupt) {
+    if (bankruptCheck.changed && bankruptCheck.newPlayers[activePlayerIndex].isBankrupt) {
        msg += `\n🚨 資金或信用歸零，宣告破產！`;
        nextState = 'END_TURN';
     }
 
-    try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
-        players: bankruptCheck.newPlayers,
-        properties: bankruptCheck.changed ? clearBankruptProperties(gameData.properties, bankruptCheck.newPlayers.filter(p=>p.isBankrupt).map(p=>p.id)) : gameData.properties,
-        gameState: nextState,
-        actionMessage: msg
-      });
-    } catch (e) { console.error("Land error", e); }
+    await syncGameData({
+      players: bankruptCheck.newPlayers,
+      properties: bankruptCheck.changed ? clearBankruptProperties(gameData.properties, bankruptCheck.newPlayers.filter(p=>p.isBankrupt).map(p=>p.id)) : gameData.properties,
+      gameState: nextState,
+      actionMessage: msg
+    });
   };
 
-  // 🌟 5. 靜心室「擲杯」系統 (重製版)
-  const handleBwaBwei = async () => {
-    if (gameData.currentPlayerIdx !== myPlayerIndex) return;
+  // 🌟 5. 靜心室「馬上擲杯」系統
+  const handleImmediateBwaBwei = async () => {
+    if (gameData.currentPlayerIdx !== activePlayerIndex) return;
     
-    // 擲三次杯 (大於0.5算聖杯)
     const results = Array(3).fill(0).map(() => Math.random() > 0.5);
     const holyCount = results.filter(r => r).length;
     const newPlayers = [...gameData.players];
-    let msg = `擲杯結果：${holyCount} 次聖杯！\n`;
+    let msg = `擲杯結果：【 ${holyCount} 次聖杯 】\n`;
 
-    try {
-      if (holyCount === 3) {
-        newPlayers[myPlayerIndex].jailRoundsLeft = 0;
-        newPlayers[myPlayerIndex].money -= 500;
-        newPlayers[myPlayerIndex].inJail = false;
-        msg += `神明原諒你了！(繳交罰款 $500)\n立刻出獄，可以繼續擲骰子。`;
-        
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
-          players: newPlayers,
-          gameState: 'IDLE', // 回到閒置可擲骰狀態
-          actionMessage: msg
-        });
-      } else {
-        const waitRounds = 3 - holyCount; // 2聖=等1輪, 1聖=等2輪, 0聖=等3輪
-        newPlayers[myPlayerIndex].jailRoundsLeft = waitRounds;
-        msg += `需在靜心房繼續反省 ${waitRounds} 輪。`;
-
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
-          players: newPlayers,
-          gameState: 'END_TURN',
-          actionMessage: msg
-        });
-      }
-    } catch (e) { console.error("BwaBwei error", e); }
+    if (holyCount === 3) {
+      newPlayers[activePlayerIndex].jailRoundsLeft = 0;
+      newPlayers[activePlayerIndex].money -= 500;
+      newPlayers[activePlayerIndex].inJail = false;
+      msg += `神明原諒你了！(已繳交罰款 $500)\n你重獲自由，下回合可正常行動。`;
+    } else {
+      const waitRounds = 3 - holyCount; 
+      newPlayers[activePlayerIndex].jailRoundsLeft = waitRounds;
+      msg += `神明要你繼續反省...\n需在靜心房等待 ${waitRounds} 輪。`;
+    }
+    
+    await syncGameData({
+      players: newPlayers,
+      gameState: 'END_TURN', 
+      actionMessage: msg
+    });
   };
 
   // 🌟 購買土地
   const handleBuyProperty = async () => {
     try {
-      const player = gameData.players[myPlayerIndex];
+      const player = gameData.players[activePlayerIndex];
       const sq = BOARD_SQUARES[player.pos];
       
       const pMoney = Number(player.money || 0);
@@ -586,12 +609,12 @@ export default function App() {
 
       if (pMoney >= reqMoney && pTrust >= reqTrust) {
         const newPlayers = [...gameData.players];
-        newPlayers[myPlayerIndex].money -= reqMoney;
+        newPlayers[activePlayerIndex].money -= reqMoney;
 
         const currentProps = gameData.properties || {};
         const newProps = { ...currentProps, [sq.id]: player.id }; 
 
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+        await syncGameData({
           players: newPlayers,
           properties: newProps,
           gameState: 'END_TURN',
@@ -606,7 +629,7 @@ export default function App() {
   // 🌟 管理資產：變賣房產
   const handleSellProperty = async (sqId) => {
      try {
-        const player = gameData.players[myPlayerIndex];
+        const player = gameData.players[activePlayerIndex];
         const sq = BOARD_SQUARES[sqId];
         if (!sq) return;
         
@@ -614,12 +637,12 @@ export default function App() {
         const sellPrice = isHighTrust ? sq.price : Math.floor(sq.price / 2);
 
         const newPlayers = [...gameData.players];
-        newPlayers[myPlayerIndex].money += sellPrice;
+        newPlayers[activePlayerIndex].money += sellPrice;
 
         const newProps = { ...gameData.properties };
         delete newProps[sqId];
 
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+        await syncGameData({
             players: newPlayers,
             properties: newProps
         });
@@ -629,17 +652,17 @@ export default function App() {
   // 🌟 管理資產：抵押信用
   const handleMortgageTrust = async () => {
      try {
-         const player = gameData.players[myPlayerIndex];
+         const player = gameData.players[activePlayerIndex];
          if (player.trust <= 1) return; // 不能全部換光，否則會破產
          
          const isHighTrust = player.trust >= 10;
          const exchangeRate = isHighTrust ? 1000 : 500;
 
          const newPlayers = [...gameData.players];
-         newPlayers[myPlayerIndex].trust -= 1;
-         newPlayers[myPlayerIndex].money += exchangeRate;
+         newPlayers[activePlayerIndex].trust -= 1;
+         newPlayers[activePlayerIndex].money += exchangeRate;
 
-         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+         await syncGameData({
              players: newPlayers
          });
      } catch(e) {}
@@ -648,36 +671,39 @@ export default function App() {
   // 結束回合
   const handleEndTurn = async () => {
     try {
-      const newPlayers = [...gameData.players];
-      const bankruptCheck = checkBankruptcy(newPlayers);
+      let newPlayers = [...gameData.players];
       let nextIdx = gameData.currentPlayerIdx;
       
-      // 尋找下一個未破產的玩家
       let attempts = 0;
       do {
-          nextIdx = (nextIdx + 1) % gameData.players.length;
+          nextIdx = (nextIdx + 1) % newPlayers.length;
           attempts++;
-      } while (bankruptCheck.newPlayers[nextIdx].isBankrupt && attempts < 10);
+      } while (newPlayers[nextIdx].isBankrupt && attempts < 10);
 
-      // 自動處理靜心房倒數
-      const nextPlayer = bankruptCheck.newPlayers[nextIdx];
+      let nextPlayer = newPlayers[nextIdx];
       let nextState = 'IDLE';
       let msg = '';
 
       if (nextPlayer.inJail && nextPlayer.jailRoundsLeft > 0) {
-          bankruptCheck.newPlayers[nextIdx].jailRoundsLeft -= 1;
+          nextPlayer.jailRoundsLeft -= 1;
           
-          if (bankruptCheck.newPlayers[nextIdx].jailRoundsLeft === 0) {
-              bankruptCheck.newPlayers[nextIdx].money -= 500;
-              bankruptCheck.newPlayers[nextIdx].inJail = false;
-              msg = `${nextPlayer.name} 反省期滿，繳交罰金 $500，離開靜心房！`;
+          if (nextPlayer.jailRoundsLeft === 0) {
+              nextPlayer.money -= 500;
+              nextPlayer.inJail = false;
+              msg = `🌟 ${nextPlayer.name} 反省期滿，已扣除罰金 $500。\n離開靜心房，可正常行動！`;
           } else {
-              nextState = 'END_TURN'; // 直接跳過
-              msg = `${nextPlayer.name} 仍在靜心房反省中... (剩餘 ${bankruptCheck.newPlayers[nextIdx].jailRoundsLeft} 輪)`;
+              nextState = 'END_TURN'; 
+              msg = `🔒 ${nextPlayer.name} 仍在靜心房反省中...\n(剩餘等待 ${nextPlayer.jailRoundsLeft} 輪)`;
           }
       }
 
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+      const bankruptCheck = checkBankruptcy(newPlayers);
+      if (bankruptCheck.newPlayers[nextIdx].isBankrupt && nextPlayer.inJail === false) {
+          msg += `\n🚨 資金或信用歸零，宣告破產！`;
+          nextState = 'END_TURN';
+      }
+
+      await syncGameData({
         players: bankruptCheck.newPlayers,
         properties: bankruptCheck.changed ? clearBankruptProperties(gameData.properties, bankruptCheck.newPlayers.filter(p=>p.isBankrupt).map(p=>p.id)) : gameData.properties,
         currentPlayerIdx: nextIdx,
@@ -700,19 +726,64 @@ export default function App() {
         
         <div className="bg-white border-[6px] border-yellow-300 p-8 rounded-[2rem] shadow-xl w-full max-w-md flex flex-col items-center gap-6">
           
-          {/* --- 初始選單 --- */}
+          {/* --- 🌟 初始選單 (新增單機同樂) --- */}
           {setupMode === 'INIT' && (
             <div className="flex flex-col gap-4 w-full">
-              <button disabled={!user} onClick={() => setSetupMode('CREATE')} className={`py-5 rounded-2xl font-black text-2xl shadow-md transition ${!user ? 'bg-slate-300 text-slate-500' : 'bg-orange-500 text-white hover:bg-orange-400 hover:-translate-y-1'}`}>
-                {user ? "創建遊戲房間" : "雲端連線中..."}
+              <button onClick={() => setSetupMode('LOCAL')} className="py-5 rounded-2xl font-black text-2xl bg-emerald-500 text-white shadow-md hover:bg-emerald-400 transition hover:-translate-y-1 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></div>
+                單機同樂 <span className="text-sm block font-bold text-emerald-100 mt-1">一台設備大家輪流玩</span>
               </button>
-              <button disabled={!user} onClick={() => setSetupMode('JOIN')} className="py-5 rounded-2xl font-black text-2xl bg-sky-500 text-white shadow-md hover:bg-sky-400 transition hover:-translate-y-1">
-                加入好友房間
+              
+              <div className="flex items-center gap-4 my-2 opacity-50">
+                <div className="flex-1 h-0.5 bg-slate-300"></div>
+                <span className="font-bold text-slate-400 text-sm">線上模式</span>
+                <div className="flex-1 h-0.5 bg-slate-300"></div>
+              </div>
+
+              <button disabled={!user} onClick={() => setSetupMode('CREATE')} className={`py-4 rounded-2xl font-black text-xl shadow-md transition ${!user ? 'bg-slate-300 text-slate-500' : 'bg-orange-500 text-white hover:bg-orange-400 hover:-translate-y-1'}`}>
+                {user ? "創建連線房間" : "雲端連線中..."}
+              </button>
+              <button disabled={!user} onClick={() => setSetupMode('JOIN')} className="py-4 rounded-2xl font-black text-xl bg-sky-500 text-white shadow-md hover:bg-sky-400 transition hover:-translate-y-1">
+                加入連線房間
               </button>
             </div>
           )}
 
-          {/* --- 創建房間設定 --- */}
+          {/* --- 🌟 單機房間設定 --- */}
+          {setupMode === 'LOCAL' && (
+            <div className="w-full flex flex-col items-center gap-6 animate-in fade-in slide-in-from-bottom-4">
+              <div className="w-full">
+                <div className="text-center font-bold text-emerald-600 mb-3 flex items-center justify-center gap-2 text-lg"><UsersIcon size={20}/> 選擇玩家人數</div>
+                <div className="flex justify-center gap-3">
+                  {[2, 3, 4, 5, 6].map(num => (
+                    <button key={num} onClick={() => setSetupPlayerCount(num)} className={`w-12 h-12 rounded-full font-black text-xl transition-all ${setupPlayerCount === num ? 'bg-emerald-500 text-white scale-110 shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="w-full border-t-2 border-slate-100"></div>
+
+              <div className="w-full">
+                <div className="text-center font-bold text-emerald-600 mb-3 flex items-center justify-center gap-2 text-lg"><Clock size={20}/> 設定遊戲時間</div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {[{l: '5 分鐘', v: 300}, {l: '10 分鐘', v: 600}, {l: '20 分鐘', v: 1200}, {l: '30 分鐘', v: 1800}, {l: '不限時', v: -1}].map(t => (
+                    <button key={t.v} onClick={() => setSetupTimeLimit(t.v)} className={`px-4 py-2 rounded-full font-bold transition-all border-2 ${setupTimeLimit === t.v ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'border-slate-200 text-slate-500 hover:border-emerald-300'}`}>
+                      {t.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex w-full gap-3 mt-4">
+                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-4 font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition">返回</button>
+                <button onClick={handleStartLocalGame} className="flex-[2] py-4 font-black text-white bg-emerald-600 rounded-xl shadow-lg hover:bg-emerald-500 transition text-xl">開始遊戲</button>
+              </div>
+            </div>
+          )}
+
+          {/* --- 連線創建房間設定 --- */}
           {setupMode === 'CREATE' && (
             <div className="w-full flex flex-col items-center gap-6 animate-in fade-in slide-in-from-bottom-4">
               
@@ -760,7 +831,7 @@ export default function App() {
             </div>
           )}
 
-          {/* --- 加入房間設定 --- */}
+          {/* --- 連線加入房間設定 --- */}
           {setupMode === 'JOIN' && (
             <div className="w-full flex flex-col items-center gap-6 animate-in fade-in slide-in-from-bottom-4">
               <div className="w-full">
@@ -828,8 +899,7 @@ export default function App() {
      );
   }
 
-  const currentPlayer = gameData.players[gameData.currentPlayerIdx];
-  const myPlayer = gameData.players[myPlayerIndex];
+  const myPlayer = gameData.players[activePlayerIndex];
   const currentSquare = myPlayer ? BOARD_SQUARES[myPlayer.pos] : null;
 
   const myTrust = Number(myPlayer?.trust || 0);
@@ -838,11 +908,9 @@ export default function App() {
   const reqMoney = Number(currentSquare?.price || 0);
   const canBuy = myMoney >= reqMoney && myTrust >= reqTrust;
 
-  const myProperties = Object.keys(gameData.properties || {}).filter(sqId => gameData.properties[sqId] === myPlayerIndex);
+  const myProperties = Object.keys(gameData.properties || {}).filter(sqId => gameData.properties[sqId] === activePlayerIndex);
   
-  // 🌟 絕對防護的骰子狀態
   const safeDice = displayDice || [1, 1];
-  const serverDice = gameData.diceVals || [1, 1];
 
   return (
     <div className="h-screen w-screen bg-[#0a192f] overflow-hidden relative touch-none select-none font-sans">
@@ -854,8 +922,8 @@ export default function App() {
           {formatTime(localTimeLeft)}
         </div>
         
-        <div className="bg-[#fffbf0] text-slate-800 rounded-full px-5 py-2 flex items-center justify-center font-black shadow-lg h-14 shrink-0 border-2 border-yellow-400 tracking-wider">
-          房號: <span className="ml-1 text-blue-600">{roomId}</span>
+        <div className={`text-slate-800 rounded-full px-5 py-2 flex items-center justify-center font-black shadow-lg h-14 shrink-0 border-2 tracking-wider ${isOfflineMode ? 'bg-emerald-100 border-emerald-400' : 'bg-[#fffbf0] border-yellow-400'}`}>
+          {isOfflineMode ? '單機同樂' : <>房號: <span className="ml-1 text-blue-600">{roomId}</span></>}
         </div>
 
         {gameData.players.map(p => (
@@ -867,7 +935,7 @@ export default function App() {
             <div className="flex flex-col justify-center min-w-[80px]">
               <div className="text-[11px] font-bold text-slate-500 flex justify-between items-center leading-tight mb-0.5">
                 <span>{p.name} {p.isBankrupt && '(破產)'}</span>
-                {p.uid === user.uid && <span className="text-blue-500 ml-1">(你)</span>}
+                {p.uid === user?.uid && !isOfflineMode && <span className="text-blue-500 ml-1">(你)</span>}
               </div>
               {p.uid !== null && !p.isBankrupt ? (
                 <div className="flex gap-2 items-baseline leading-none">
@@ -892,7 +960,7 @@ export default function App() {
          {showAssetManager && (
             <div className="absolute bottom-20 left-0 bg-white p-6 rounded-3xl shadow-2xl border-4 border-slate-800 w-80 animate-in slide-in-from-bottom-4">
                 <div className="flex justify-between items-center border-b-2 border-slate-100 pb-3 mb-4">
-                    <h3 className="font-black text-xl text-slate-800">💼 管理資產</h3>
+                    <h3 className="font-black text-xl text-slate-800">💼 管理資產 {isOfflineMode && `(${myPlayer?.name})`}</h3>
                     <button onClick={() => setShowAssetManager(false)} className="text-slate-400 hover:text-slate-600 font-bold">關閉</button>
                 </div>
 
@@ -911,7 +979,7 @@ export default function App() {
                 <div>
                     <div className="text-sm font-bold text-slate-500 mb-2">變賣房產</div>
                     {myProperties.length === 0 ? (
-                        <div className="text-center text-slate-400 italic py-4 bg-slate-50 rounded-xl">你目前沒有任何土地</div>
+                        <div className="text-center text-slate-400 italic py-4 bg-slate-50 rounded-xl">此玩家沒有任何土地</div>
                     ) : (
                         <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-2">
                            {myProperties.map(sqId => {
@@ -948,9 +1016,33 @@ export default function App() {
         <button onClick={() => setIsFullMapMode(!isFullMapMode)} className={`w-12 h-12 backdrop-blur rounded-full shadow-xl flex items-center justify-center transition-colors border ${isFullMapMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-white/90 text-slate-700 hover:bg-slate-50 border-slate-200'}`}>
           <Map size={24}/>
         </button>
+        
+        <div className="w-8 h-[2px] bg-slate-600/30 mx-auto my-0.5 rounded-full"></div>
+
+        <button onClick={() => setIsMuted(!isMuted)} className={`w-12 h-12 backdrop-blur rounded-full shadow-xl flex items-center justify-center transition-colors border ${isMuted ? 'bg-slate-700 text-white border-slate-600' : 'bg-white/90 text-slate-700 hover:bg-slate-50 hover:text-blue-600 border-slate-200'}`}>
+          {isMuted ? <VolumeX size={24}/> : <Volume2 size={24}/>}
+        </button>
+
+        <button onClick={() => setShowExitConfirm(true)} className="w-12 h-12 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors border border-red-200 mt-1">
+          <LogOut size={24} className="ml-1"/>
+        </button>
       </div>
 
-      {/* 🌟 全螢幕真實骰子滾動動畫 (修復崩潰版) */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
+          <div className="bg-white p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full mx-4 animate-in zoom-in-95">
+            <div className="text-red-500 bg-red-100 p-4 rounded-full"><LogOut size={40} className="ml-1" /></div>
+            <h3 className="text-2xl font-black text-slate-800">確定要返回主選單？</h3>
+            <p className="text-slate-500 font-bold text-center">離開後將結束目前的遊戲進度。</p>
+            <div className="flex gap-4 w-full mt-2">
+              <button onClick={() => setShowExitConfirm(false)} className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition">取消</button>
+              <button onClick={() => window.location.reload()} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-lg transition">確定離開</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 全螢幕真實骰子滾動動畫 */}
       {gameData.gameState === 'ROLLING' && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-md">
           <div className="text-white font-black text-4xl mb-10 tracking-widest animate-pulse drop-shadow-lg">擲骰子中...</div>
@@ -958,13 +1050,6 @@ export default function App() {
             <DiceIcon value={safeDice[0]} className="w-40 h-40 text-white animate-bounce drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0s' }} />
             <DiceIcon value={safeDice[1]} className="w-40 h-40 text-white animate-bounce drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0.1s' }} />
           </div>
-        </div>
-      )}
-
-      {/* 顯示骰出的點數 */}
-      {(gameData.gameState === 'MOVING' || gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-white/95 p-3 px-8 rounded-full shadow-2xl font-black text-2xl flex items-center gap-4 z-50 border-4 border-blue-500">
-          🎲 {serverDice[0]} + {serverDice[1]} = <span className="text-blue-600 text-3xl">{serverDice[0] + serverDice[1]}</span> 步
         </div>
       )}
 
@@ -995,30 +1080,38 @@ export default function App() {
               else if (isTop) contentClass += " rotate-180";
               else if (isRight) contentClass += " -rotate-90";
 
-              return (
-                <div key={idx} className="bg-[#fffdf5] rounded-md relative flex flex-col overflow-hidden shadow-sm" style={{ gridRow: row, gridColumn: col, borderBottom: '5px solid #4a3424', borderRight: '1px solid #dcd3cb', borderLeft: '1px solid #dcd3cb', borderTop: '1px solid #dcd3cb' }}>
-                  
-                  {sq.type === 'PROPERTY' && (
-                    <div className={`h-[25%] w-full ${owner ? getOwnerBgColor(owner.color) : sq.color} border-b border-black/10 z-0`}></div>
-                  )}
+              const isActiveCell = activePlayersHere.some(p => p.id === gameData.currentPlayerIdx);
 
-                  <div className={contentClass}>
-                    <span className="font-black text-slate-800 text-lg leading-tight text-center">{sq.name}</span>
-                    {sq.price && <span className="text-blue-600 font-black text-base leading-tight mt-1">${sq.price}</span>}
-                    {sq.reqTrust > 0 && (
-                      <div className="mt-1.5 bg-yellow-100 text-yellow-700 text-xs font-black px-2 py-0.5 rounded-full border border-yellow-300 flex items-center justify-center gap-1 shadow-sm">
-                        <Star size={12} fill="currentColor"/> {sq.reqTrust}
-                      </div>
+              return (
+                <React.Fragment key={idx}>
+                  <div className="bg-[#fffdf5] rounded-md relative flex flex-col overflow-hidden shadow-sm z-10" style={{ gridRow: row, gridColumn: col, borderBottom: '5px solid #4a3424', borderRight: '1px solid #dcd3cb', borderLeft: '1px solid #dcd3cb', borderTop: '1px solid #dcd3cb' }}>
+                    
+                    {sq.type === 'PROPERTY' && (
+                      <div className={`h-[25%] w-full ${owner ? getOwnerBgColor(owner.color) : sq.color} border-b border-black/10 z-0`}></div>
                     )}
+
+                    <div className={contentClass}>
+                      <span className="font-black text-slate-800 text-2xl leading-tight text-center drop-shadow-sm">{sq.name}</span>
+                      
+                      {sq.type === 'START' && <span className="text-emerald-700 font-black text-lg leading-tight mt-1.5 bg-emerald-100 px-3 py-0.5 rounded-full border-2 border-emerald-400 shadow-sm">領 $500</span>}
+                      {sq.type === 'TAX' && <span className="text-red-700 font-black text-lg leading-tight mt-1.5 bg-red-100 px-3 py-0.5 rounded-full border-2 border-red-400 shadow-sm">繳 ${sq.amount}</span>}
+                      
+                      {sq.price && <span className="text-blue-700 font-black text-xl leading-tight mt-1">${sq.price}</span>}
+                      
+                      {sq.reqTrust > 0 && (
+                        <div className="mt-1.5 bg-yellow-100 text-yellow-700 text-sm font-black px-2.5 py-0.5 rounded-full border-2 border-yellow-400 flex items-center justify-center gap-1 shadow-sm">
+                          <Star size={14} fill="currentColor" className="drop-shadow-sm"/> {sq.reqTrust}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* 🌟 玩家棋子與超大倒數計步器 */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                  <div className={`pointer-events-none flex items-center justify-center relative ${isActiveCell ? 'z-50' : 'z-20'}`} style={{ gridRow: row, gridColumn: col }}>
                     {activePlayersHere.map((p, pIdx) => (
-                      <div key={p.id} className="relative transition-all duration-300 ease-linear" style={{ transform: `translate(${pIdx * 8}px, ${pIdx * 8}px)` }}>
+                      <div key={p.id} className="absolute transition-all duration-300 ease-linear" style={{ transform: `translate(${pIdx * 8}px, ${pIdx * 8}px)` }}>
                         
                         {gameData.gameState === 'MOVING' && gameData.currentPlayerIdx === p.id && gameData.remainingSteps > 0 && (
-                          <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-white border-4 border-blue-600 text-blue-600 font-black rounded-full w-14 h-14 flex items-center justify-center text-3xl shadow-[0_5px_15px_rgba(0,0,0,0.5)] animate-bounce z-50">
+                          <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-white border-4 border-blue-600 text-blue-600 font-black rounded-full w-14 h-14 flex items-center justify-center text-3xl shadow-[0_5px_15px_rgba(0,0,0,0.5)] animate-bounce z-[100]">
                             {gameData.remainingSteps}
                           </div>
                         )}
@@ -1033,7 +1126,7 @@ export default function App() {
                       </div>
                     ))}
                   </div>
-                </div>
+                </React.Fragment>
               );
             })}
           </div>
@@ -1041,7 +1134,7 @@ export default function App() {
       </div>
 
       {/* 🎮 遊戲控制面板 */}
-      {gameData.currentPlayerIdx === myPlayerIndex && !myPlayer?.isBankrupt && (
+      {gameData.currentPlayerIdx === activePlayerIndex && !myPlayer?.isBankrupt && (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col gap-3 z-50 pointer-events-auto">
           
           {gameData.gameState === 'IDLE' && (
@@ -1051,19 +1144,29 @@ export default function App() {
                   <div className="bg-slate-800 text-white font-bold px-6 py-3 rounded-full shadow-lg border-2 border-slate-700 text-lg animate-pulse mb-1">
                     你被送進靜心房了！
                   </div>
-                  <button onClick={handleBwaBwei} className="px-10 py-5 bg-red-600 hover:bg-red-500 text-white rounded-full font-black text-3xl shadow-[0_10px_0_0_#991b1b,0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_#991b1b,0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-3 border-4 border-white animate-bounce">
+                  <button onClick={handleImmediateBwaBwei} className="px-10 py-5 bg-red-600 hover:bg-red-500 text-white rounded-full font-black text-3xl shadow-[0_10px_0_0_#991b1b,0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_#991b1b,0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-3 border-4 border-white animate-bounce">
                     🙏 擲 3 次杯請示神明
                   </button>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2">
                   {gameData.actionMessage && <div className="bg-white/95 text-slate-800 font-bold px-6 py-3 rounded-2xl shadow-lg border-4 border-slate-300 text-lg mb-2 text-center whitespace-pre-line">{(gameData.actionMessage || '')}</div>}
-                  <button onClick={handleRollDice} className="px-12 py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-4xl shadow-[0_10px_0_0_#1e3a8a,0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_#1e3a8a,0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-4 border-4 border-white animate-bounce">
+                  <button onClick={handleRollDice} className={`px-12 py-6 text-white rounded-full font-black text-4xl shadow-[0_10px_0_0_rgba(0,0,0,0.3),0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_rgba(0,0,0,0.3),0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-4 border-4 border-white animate-bounce ${isOfflineMode ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-blue-600 hover:bg-blue-500'}`}>
                     <Dice5 size={40} /> 擲骰子
                   </button>
                 </div>
               )}
             </>
+          )}
+
+          {gameData.gameState === 'JAIL_BWA_BWEI' && (
+            <div className="bg-white p-6 rounded-3xl shadow-2xl flex flex-col gap-4 border-4 border-slate-800 min-w-[320px] items-center animate-in slide-in-from-bottom">
+              <div className="font-black text-center text-red-600 text-2xl mb-1">🚨 進入靜心房</div>
+              <div className="font-bold text-center text-slate-700 text-lg mb-2 whitespace-pre-line">{(gameData.actionMessage || '')}</div>
+              <button onClick={handleImmediateBwaBwei} className="w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 px-6 rounded-2xl active:translate-y-1 active:border-b-0 transition-all shadow-lg text-xl border-b-4 border-red-800 flex justify-center items-center gap-2">
+                🙏 立刻擲 3 次杯
+              </button>
+            </div>
           )}
 
           {(gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && (
