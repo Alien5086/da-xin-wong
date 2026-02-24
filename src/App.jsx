@@ -71,8 +71,9 @@ const GRID_ORDER = (() => {
 
 const CHILD_AVATARS = ['👦', '👧', '👶', '👼', '👲', '👸', '🤴', '🤓', '🤠', '😎', '👻', '👽'];
 
-
-// --- 2. Firebase 配置管理 ---
+// =========================================================
+// 👇 請將您的 Firebase 金鑰貼在下方的引號 "" 內 👇
+// =========================================================
 const firebaseConfig = {
   apiKey: "AIzaSyBNN-5xswc1tq_Y5ymWMVGFldZRfpvsVZM",
   authDomain: "da-xin-wong.firebaseapp.com",
@@ -80,12 +81,14 @@ const firebaseConfig = {
   storageBucket: "da-xin-wong.firebasestorage.app",
   messagingSenderId: "72871979370",
   appId: "1:72871979370:web:97caab1074d5f1e8f9dd13"
-  };
 };
+// =========================================================
+
 const firebaseConfig = getFirebaseConfig();
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+
 
 // --- 3. 輔助函數 ---
 const formatTime = (seconds) => {
@@ -157,15 +160,30 @@ export default function App() {
     }
   }, []);
 
-  // --- Firebase 登入 ---
+  // --- Firebase 登入邏輯 (修復網路錯誤) ---
   useEffect(() => {
-    const initAuth = async () => {
+    const initAuth = async (retries = 3) => {
       try {
-        await signInAnonymously(auth);
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          // 在預覽環境中使用自訂權杖
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          // 檢查使用者是否忘記填寫真實金鑰
+          if (firebaseConfig.apiKey.includes("請在這裡填入")) {
+            throw new Error("INVALID_KEY");
+          }
+          await signInAnonymously(auth);
+        }
         setErrorMsg(null);
       } catch (e) {
-        console.error(e);
-        setErrorMsg("雲端連線失敗，請檢查金鑰或網路。");
+        console.error("Firebase 連線錯誤:", e);
+        if (e.message === "INVALID_KEY") {
+          setErrorMsg("部署前，請務必在 App.jsx 填入您真實的 Firebase API_KEY！");
+        } else if (retries > 0) {
+          setTimeout(() => initAuth(retries - 1), 1500); // 失敗重試
+        } else {
+          setErrorMsg("網路連線失敗，請檢查金鑰或關閉廣告阻擋器 (AdBlock)。");
+        }
       }
     };
     initAuth();
@@ -243,7 +261,7 @@ export default function App() {
       <div className="h-screen w-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
         <Smartphone size={80} className="text-blue-400 mb-4 animate-bounce" />
         <h1 className="text-4xl font-black mb-2">大信翁多人連線</h1>
-        <p className="text-slate-400 mb-8 font-bold text-sm">Vercel 穩定版 v3.0</p>
+        <p className="text-slate-400 mb-8 font-bold text-sm">Vercel 穩定連線版</p>
         {errorMsg && <div className="mb-6 bg-red-600/30 p-4 rounded-xl border border-red-500 text-sm font-bold">{errorMsg}</div>}
         <div className="flex flex-col gap-4 w-full max-w-xs">
           <button disabled={!user} onClick={() => createRoom(4)} className={`py-4 rounded-2xl font-black text-xl shadow-xl transition ${!user ? 'bg-slate-700' : 'bg-blue-600'}`}>
@@ -296,7 +314,7 @@ export default function App() {
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     {playersHere.map((p, pIdx) => (
-                      <div key={p.id} className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xl shadow-xl ${p.color} ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400' : 'z-10 opacity-90'}`} style={{ transform: `translate(${pIdx * 4}px, ${pIdx * 4}px)` }}>{p.icon}</div>
+                      <div key={p.id} className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xl shadow-xl transition-all duration-300 ${p.color} ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400' : 'z-10 opacity-90'}`} style={{ transform: `translate(${pIdx * 4}px, ${pIdx * 4}px)` }}>{p.icon}</div>
                     ))}
                   </div>
                 </div>
