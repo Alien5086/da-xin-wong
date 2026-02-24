@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 
-// --- 1. 遊戲基礎資料 ---
+// --- 1. 遊戲基礎資料 (不變) ---
 const BASE_MONEY = 17200; 
 const BOARD_SQUARES = [
   { id: 0, name: '起點', type: 'START', desc: '經過得$500' },
@@ -79,7 +79,7 @@ const firebaseConfig = {
   storageBucket: "da-xin-wong.firebasestorage.app",
   messagingSenderId: "72871979370",
   appId: "1:72871979370:web:97caab1074d5f1e8f9dd13"
- };
+  };
 };
 const firebaseConfig = getFirebaseConfig();
 const app = initializeApp(firebaseConfig);
@@ -108,6 +108,7 @@ const getOwnerBgColor = (colorClass) => {
 
 // --- 4. 主程式組件 ---
 export default function App() {
+  // 基礎狀態
   const [appPhase, setAppPhase] = useState('LANDING'); 
   const [user, setUser] = useState(null);
   const [roomId, setRoomId] = useState("");
@@ -115,6 +116,7 @@ export default function App() {
   const [myPlayerIndex, setMyPlayerIndex] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
 
+  // 遊戲雲端資料同步
   const [gameData, setGameData] = useState({
     players: [],
     currentPlayerIdx: 0,
@@ -125,6 +127,7 @@ export default function App() {
     remainingSteps: 0
   });
 
+  // UI 交互狀態
   const [zoom, setZoom] = useState(0.8);
   const [cameraOffset, setCameraOffset] = useState({ x: 0, y: 0 });
   const [manualOffset, setManualOffset] = useState({ x: 0, y: 0 });
@@ -134,28 +137,27 @@ export default function App() {
   });
   const [isFullMapMode, setIsFullMapMode] = useState(false);
 
-  const MAP_SIZE = 1600;
-  
-  // 使用 Ref 追蹤拖拽狀態，避免觸發不必要的渲染
+  // 使用 Ref 追蹤拖拽狀態
   const dragStatus = useRef({ isDragging: false, startX: 0, startY: 0 });
+  const MAP_SIZE = 1600;
 
-  // --- 地圖操作函式 (明確定義於組件內，徹底修復 ReferenceError) ---
-  const handlePointerDown = (e) => {
+  // --- 地圖操作函式 (提升定義位置，使用 useCallback) ---
+  const handlePointerDown = useCallback((e) => {
     dragStatus.current.isDragging = true;
     dragStatus.current.startX = e.clientX - manualOffset.x;
     dragStatus.current.startY = e.clientY - manualOffset.y;
-  };
+  }, [manualOffset]);
 
-  const handlePointerMove = (e) => {
+  const handlePointerMove = useCallback((e) => {
     if (!dragStatus.current.isDragging) return;
     const newX = e.clientX - dragStatus.current.startX;
     const newY = e.clientY - dragStatus.current.startY;
     setManualOffset({ x: newX, y: newY });
-  };
+  }, []);
 
-  const handlePointerUp = () => {
+  const handlePointerUp = useCallback(() => {
     dragStatus.current.isDragging = false;
-  };
+  }, []);
 
   // 監聽視窗縮放
   useEffect(() => {
@@ -283,8 +285,8 @@ export default function App() {
     >
       {/* 頂部資訊欄 */}
       <div className="bg-white/95 backdrop-blur p-2 flex justify-between items-center z-50 relative border-b-2 border-slate-800">
-        <div className="font-black px-3 py-1 bg-slate-900 text-white rounded-lg">房號: {roomId}</div>
-        <div className="font-mono font-bold text-lg bg-slate-100 px-4 py-1 rounded-full flex items-center gap-2">
+        <div className="font-black px-3 py-1 bg-slate-900 text-white rounded-lg shadow-sm">房號: {roomId}</div>
+        <div className="font-mono font-bold text-lg bg-slate-100 px-4 py-1 rounded-full flex items-center gap-2 border border-slate-200">
           <Timer size={18} className={gameData.timeLeft < 60 ? "text-red-500 animate-pulse" : "text-slate-600"}/> {formatTime(gameData.timeLeft)}
         </div>
         <button onClick={() => { setIsFullMapMode(!isFullMapMode); setManualOffset({x:0, y:0}); }} className="p-2 bg-slate-200 rounded-lg">
@@ -304,7 +306,7 @@ export default function App() {
             transform: `translate(${cameraOffset.x + manualOffset.x}px, ${cameraOffset.y + manualOffset.y}px) scale(${displayZoom})` 
           }}
         >
-          <div className="grid grid-cols-11 grid-rows-11 w-full h-full gap-1 p-2 bg-slate-300 rounded-lg">
+          <div className="grid grid-cols-11 grid-rows-11 w-full h-full gap-1 p-2 bg-slate-300 rounded-lg shadow-inner">
             {BOARD_SQUARES.map((sq, idx) => {
               const {row, col} = GRID_ORDER[idx];
               const owner = gameData.players.find(p => gameData.properties?.[idx] === p.id);
@@ -317,7 +319,7 @@ export default function App() {
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     {playersHere.map((p, pIdx) => (
-                      <div key={p.id} className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xl shadow-xl ${p.color} ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400' : 'z-10 opacity-90'}`} style={{ transform: `translate(${pIdx * 4}px, ${pIdx * 4}px)` }}>{p.icon}</div>
+                      <div key={p.id} className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xl shadow-xl transition-all duration-300 ${p.color} ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400' : 'z-10 opacity-90'}`} style={{ transform: `translate(${pIdx * 4}px, ${pIdx * 4}px)` }}>{p.icon}</div>
                     ))}
                   </div>
                 </div>
@@ -327,15 +329,16 @@ export default function App() {
         </div>
       </div>
 
-      {/* 狀態與控制按鈕 */}
-      <div className="fixed bottom-6 left-6 bg-slate-900/90 text-white p-4 rounded-3xl border border-white/20 flex items-center gap-4 z-50 shadow-2xl">
+      {/* 我的狀態欄 (左下) */}
+      <div className="fixed bottom-6 left-6 bg-slate-900/90 backdrop-blur-lg text-white p-4 rounded-3xl border border-white/20 flex items-center gap-4 z-50 shadow-2xl">
         <div className={`w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-inner ${gameData.players[myPlayerIndex]?.color || 'bg-slate-700'}`}>{gameData.players[myPlayerIndex]?.icon || '❓'}</div>
         <div>
-          <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest">我的錢包</div>
-          <div className="text-2xl font-black">${gameData.players[myPlayerIndex]?.money || 0}</div>
+          <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-0.5">我的錢包</div>
+          <div className="text-2xl font-black tabular-nums">${gameData.players[myPlayerIndex]?.money || 0}</div>
         </div>
       </div>
 
+      {/* 控制按鈕：輪到自己且狀態閒置時出現 */}
       {gameData.currentPlayerIdx === myPlayerIndex && gameData.gameState === 'IDLE' && (
         <button className="fixed bottom-6 right-6 w-28 h-28 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-2xl shadow-2xl animate-bounce z-50 border-8 border-white active:scale-90 transition-transform flex items-center justify-center text-center">擲骰</button>
       )}
