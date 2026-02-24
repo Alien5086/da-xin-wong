@@ -137,29 +137,40 @@ export default function App() {
   const [isFullMapMode, setIsFullMapMode] = useState(false);
 
   // 拖拽狀態
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
+  const dragStatus = useRef({ isDragging: false, startX: 0, startY: 0 });
+  const mapRef = useRef(null);
   const MAP_SIZE = 1600;
 
-  // --- 正確的地圖拖拽處理函式 ---
-  const handlePointerDown = (e) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - manualOffset.x, y: e.clientY - manualOffset.y });
-  };
+  // --- 手動地圖拖曳 ---
+  useEffect(() => {
+    const el = mapRef.current;
+    if (!el) return;
 
-  const handlePointerMove = (e) => {
-    if (!isDragging) return;
-    setManualOffset({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
-  };
+    function onStart(e) {
+      dragStatus.current.isDragging = true;
+      dragStatus.current.startX = e.clientX - manualOffset.x;
+      dragStatus.current.startY = e.clientY - manualOffset.y;
+    }
+    function onMove(e) {
+      if (!dragStatus.current.isDragging) return;
+      setManualOffset({ 
+        x: e.clientX - dragStatus.current.startX, 
+        y: e.clientY - dragStatus.current.startY 
+      });
+    }
+    function onEnd() { dragStatus.current.isDragging = false; }
 
-  const handlePointerUp = (e) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    setIsDragging(false);
-  };
+    el.addEventListener('pointerdown', onStart);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onEnd);
+    return () => {
+      el.removeEventListener('pointerdown', onStart);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onEnd);
+    };
+  }, [manualOffset]);
 
-  // --- 生命週期與視窗縮放 ---
+  // --- 視窗縮放 ---
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setViewportSize({ w: window.innerWidth, h: window.innerHeight });
@@ -169,27 +180,24 @@ export default function App() {
     }
   }, []);
 
-  // --- Firebase 登入邏輯 (修復網路錯誤) ---
+  // --- Firebase 登入 ---
   useEffect(() => {
     const initAuth = async (retries = 3) => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
-          if (firebaseConfig.apiKey.includes("請在這裡填入")) {
-            throw new Error("INVALID_KEY");
-          }
+          if (firebaseConfig.apiKey.includes("請貼上")) throw new Error("INVALID_KEY");
           await signInAnonymously(auth);
         }
         setErrorMsg(null);
       } catch (e) {
-        console.error("Firebase 連線錯誤:", e);
         if (e.message === "INVALID_KEY") {
-          setErrorMsg("部署前，請務必在 App.jsx 填入您真實的 Firebase API_KEY！");
+          setErrorMsg("請在 App.jsx 填入您真實的 Firebase API_KEY！");
         } else if (retries > 0) {
           setTimeout(() => initAuth(retries - 1), 1500); 
         } else {
-          setErrorMsg("網路連線失敗，請檢查金鑰或關閉廣告阻擋器 (AdBlock)。");
+          setErrorMsg("網路連線失敗。");
         }
       }
     };
@@ -241,7 +249,7 @@ export default function App() {
     }));
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
-        players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: 600
+        players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: 600, properties: {}
       });
       setRoomId(id); setIsHost(true); setMyPlayerIndex(0); setAppPhase('GAME');
     } catch (e) { setErrorMsg("建立失敗，請確認 Firebase 設定。"); }
@@ -262,13 +270,73 @@ export default function App() {
     } catch (e) { setErrorMsg("加入失敗。"); }
   };
 
+  // ==========================================
+  // 🎲 遊戲核心邏輯 (本次修復重點！)
+  // ==========================================
+
+  // 1. 擲骰子
+  const handleRollDice = async () => {
+    if (gameData.currentPlayerIdx !== myPlayerIndex) return;
+
+    const d1 = Math.floor(Math.random() * 6) + 1;
+    const d2 = Math.floor(Math.random() * 6) + 1;
+    const steps = d1 + d2;
+    const player = gameData.players[myPlayerIndex];
+
+    let newPos = player.pos + steps;
+    let newMoney = player.money;
+
+    // 經過起點加薪
+    if (newPos >= 40) {
+      newPos = newPos % 40;
+      newMoney += 500; 
+    }
+
+    const newPlayers = [...gameData.players];
+    newPlayers[myPlayerIndex] = { ...player, pos: newPos, money: newMoney };
+
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+      players: newPlayers,
+      diceVals: [d1, d2],
+      gameState: 'ACTION' // 進入行動階段 (購買/付過路費)
+    });
+  };
+
+  // 2. 購買土地
+  const handleBuyProperty = async () => {
+    const player = gameData.players[myPlayerIndex];
+    const sq = BOARD_SQUARES[player.pos];
+
+    if (player.money >= sq.price) {
+      const newPlayers = [...gameData.players];
+      newPlayers[myPlayerIndex].money -= sq.price;
+
+      const newProps = { ...gameData.properties, [player.pos]: player.id };
+
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+        players: newPlayers,
+        properties: newProps,
+        gameState: 'END_TURN'
+      });
+    }
+  };
+
+  // 3. 結束回合
+  const handleEndTurn = async () => {
+    const nextIdx = (gameData.currentPlayerIdx + 1) % gameData.players.length;
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
+      currentPlayerIdx: nextIdx,
+      gameState: 'IDLE' // 輪到下一位
+    });
+  };
+
   // --- 畫面渲染 ---
   if (appPhase === 'LANDING') {
     return (
       <div className="h-screen w-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
         <Smartphone size={80} className="text-blue-400 mb-4 animate-bounce" />
         <h1 className="text-4xl font-black mb-2">大信翁多人連線</h1>
-        <p className="text-slate-400 mb-8 font-bold text-sm">Vercel 穩定連線版</p>
+        <p className="text-slate-400 mb-8 font-bold text-sm">遊戲邏輯恢復版</p>
         {errorMsg && <div className="mb-6 bg-red-600/30 p-4 rounded-xl border border-red-500 text-sm font-bold">{errorMsg}</div>}
         <div className="flex flex-col gap-4 w-full max-w-xs">
           <button disabled={!user} onClick={() => createRoom(4)} className={`py-4 rounded-2xl font-black text-xl shadow-xl transition ${!user ? 'bg-slate-700' : 'bg-blue-600'}`}>
@@ -281,11 +349,16 @@ export default function App() {
     );
   }
 
+  const currentPlayer = gameData.players[gameData.currentPlayerIdx];
+  const myPlayer = gameData.players[myPlayerIndex];
+  const currentSquare = myPlayer ? BOARD_SQUARES[myPlayer.pos] : null;
+
   return (
     <div className="h-screen w-screen bg-slate-950 overflow-hidden relative touch-none select-none">
       <div className="bg-white/95 backdrop-blur p-2 flex justify-between items-center z-50 relative border-b-2 border-slate-800">
         <div className="font-black px-3 py-1 bg-slate-900 text-white rounded-lg">房號: {roomId}</div>
         <div className="font-mono font-bold text-lg bg-slate-100 px-4 py-1 rounded-full flex items-center gap-2">
+          {currentPlayer && <span className="text-sm mr-2 text-blue-600">輪到：{currentPlayer.name}</span>}
           <Timer size={18} className={gameData.timeLeft < 60 ? "text-red-500 animate-pulse" : "text-slate-600"}/> {formatTime(gameData.timeLeft)}
         </div>
         <button onClick={() => { setIsFullMapMode(!isFullMapMode); setManualOffset({x:0, y:0}); }} className="p-2 bg-slate-200 rounded-lg">
@@ -293,14 +366,15 @@ export default function App() {
         </button>
       </div>
 
+      {/* 顯示擲骰結果 */}
+      {gameData.gameState !== 'IDLE' && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-white/95 p-3 px-6 rounded-full shadow-2xl font-black text-2xl flex items-center gap-4 z-50 border-4 border-blue-500 animate-bounce">
+          🎲 {gameData.diceVals[0]} + {gameData.diceVals[1]} = {gameData.diceVals[0] + gameData.diceVals[1]} 步
+        </div>
+      )}
+
       {/* 地圖區域 */}
-      <div 
-        className="flex-grow relative w-full h-full cursor-grab active:cursor-grabbing overflow-hidden"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      >
+      <div ref={mapRef} className="flex-grow relative w-full h-full cursor-grab active:cursor-grabbing overflow-hidden">
         <div 
           className="absolute top-0 left-0 origin-top-left transition-transform duration-700 ease-out pointer-events-none" 
           style={{ 
@@ -308,7 +382,6 @@ export default function App() {
             transform: `translate(${cameraOffset.x + manualOffset.x}px, ${cameraOffset.y + manualOffset.y}px) scale(${displayZoom})` 
           }}
         >
-          {/* ✅ 這裡已經修復了地圖排版的 CSS 問題，並確保語法正確 */}
           <div 
             className="w-full h-full gap-1 p-2 bg-slate-300 rounded-lg shadow-inner"
             style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gridTemplateRows: 'repeat(11, 1fr)' }}
@@ -335,16 +408,55 @@ export default function App() {
         </div>
       </div>
 
-      <div className="fixed bottom-6 left-6 bg-slate-900/90 text-white p-4 rounded-3xl border border-white/20 flex items-center gap-4 z-50 shadow-2xl">
-        <div className={`w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-inner ${gameData.players[myPlayerIndex]?.color || 'bg-slate-700'}`}>{gameData.players[myPlayerIndex]?.icon || '❓'}</div>
+      <div className="fixed bottom-6 left-6 bg-slate-900/95 text-white p-4 rounded-3xl border border-white/20 flex items-center gap-4 z-50 shadow-2xl">
+        <div className={`w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-inner ${myPlayer?.color || 'bg-slate-700'}`}>{myPlayer?.icon || '❓'}</div>
         <div>
           <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-0.5">我的錢包</div>
-          <div className="text-2xl font-black">${gameData.players[myPlayerIndex]?.money || 0}</div>
+          <div className="text-2xl font-black">${myPlayer?.money || 0}</div>
         </div>
       </div>
 
-      {gameData.currentPlayerIdx === myPlayerIndex && gameData.gameState === 'IDLE' && (
-        <button className="fixed bottom-6 right-6 w-28 h-28 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-2xl shadow-2xl animate-bounce z-50 border-8 border-white active:scale-90 transition-transform flex items-center justify-center text-center">擲骰</button>
+      {/* 🎮 遊戲控制面板 (已恢復) */}
+      {gameData.currentPlayerIdx === myPlayerIndex && (
+        <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50">
+          
+          {/* 狀態 1：還沒擲骰子 */}
+          {gameData.gameState === 'IDLE' && (
+            <button onClick={handleRollDice} className="w-28 h-28 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-3xl shadow-2xl animate-bounce border-8 border-white active:scale-90 transition-transform flex items-center justify-center">
+              擲骰
+            </button>
+          )}
+
+          {/* 狀態 2：移動完畢，選擇行動 */}
+          {gameData.gameState === 'ACTION' && (
+            <div className="bg-white p-5 rounded-3xl shadow-2xl flex flex-col gap-3 border-4 border-slate-800 animate-in slide-in-from-bottom">
+              <div className="font-black text-center text-slate-800 mb-1 border-b-2 pb-2">你來到了：<br/><span className="text-blue-600 text-xl">{currentSquare?.name}</span></div>
+              
+              {/* 如果是空地且錢夠，顯示購買按鈕 */}
+              {currentSquare?.type === 'PROPERTY' && !gameData.properties[myPlayer.pos] && (
+                <button 
+                  onClick={handleBuyProperty} 
+                  disabled={myPlayer.money < currentSquare.price}
+                  className={`font-black py-4 px-6 rounded-2xl active:scale-95 transition-transform ${myPlayer.money >= currentSquare.price ? 'bg-green-500 hover:bg-green-400 text-white shadow-lg' : 'bg-slate-200 text-slate-400'}`}
+                >
+                  購買 (${currentSquare.price})
+                </button>
+              )}
+              
+              <button onClick={handleEndTurn} className="bg-slate-800 hover:bg-slate-700 text-white font-black py-4 px-6 rounded-2xl active:scale-95 transition-transform shadow-lg">
+                結束回合
+              </button>
+            </div>
+          )}
+
+          {/* 狀態 3：已經購買完畢，只能結束 */}
+          {gameData.gameState === 'END_TURN' && (
+            <button onClick={handleEndTurn} className="w-28 h-28 bg-slate-800 hover:bg-slate-700 text-white rounded-full font-black text-xl shadow-2xl border-8 border-white active:scale-90 transition-transform flex flex-col items-center justify-center animate-pulse">
+              <span>結束</span><span>回合</span>
+            </button>
+          )}
+
+        </div>
       )}
     </div>
   );
