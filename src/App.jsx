@@ -74,13 +74,22 @@ const CHILD_AVATARS = ['👦', '👧', '👶', '👼', '👲', '👸', '🤴', '
 // =========================================================
 // 👇 請將您的 Firebase 金鑰貼在下方的引號 "" 內 👇
 // =========================================================
-const firebaseConfig = {
-  apiKey: "AIzaSyBNN-5xswc1tq_Y5ymWMVGFldZRfpvsVZM",
-  authDomain: "da-xin-wong.firebaseapp.com",
-  projectId: "da-xin-wong",
-  storageBucket: "da-xin-wong.firebasestorage.app",
-  messagingSenderId: "72871979370",
-  appId: "1:72871979370:web:97caab1074d5f1e8f9dd13"
+const getFirebaseConfig = () => {
+  try {
+    if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+      return JSON.parse(__firebase_config);
+    }
+  } catch (e) {
+    console.warn("使用預設金鑰");
+  }
+  return {
+    apiKey: "AIzaSyBNN-5xswc1tq_Y5ymWMVGFldZRfpvsVZM",
+    authDomain: "da-xin-wong.firebaseapp.com",
+    projectId: "da-xin-wong",
+    storageBucket: "da-xin-wong.appspot.com",
+    messagingSenderId: "72871979370",
+    appId: "1:72871979370:web:97caab1074d5f1e8f9dd13"
+  };
 };
 // =========================================================
 
@@ -88,7 +97,7 @@ const firebaseConfig = getFirebaseConfig();
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
 
 // --- 3. 輔助函數 ---
 const formatTime = (seconds) => {
