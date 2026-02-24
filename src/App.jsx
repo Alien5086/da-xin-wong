@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 
-// --- 1. 遊戲基礎資料 (不變) ---
+// --- 1. 遊戲基礎資料 ---
 const BASE_MONEY = 17200; 
 const BOARD_SQUARES = [
   { id: 0, name: '起點', type: 'START', desc: '經過得$500' },
@@ -137,27 +137,51 @@ export default function App() {
   });
   const [isFullMapMode, setIsFullMapMode] = useState(false);
 
+  const MAP_SIZE = 1600;
+  
   // 使用 Ref 追蹤拖拽狀態
   const dragStatus = useRef({ isDragging: false, startX: 0, startY: 0 });
-  const MAP_SIZE = 1600;
+  const mapRef = useRef(null);
 
-  // --- 地圖操作函式 (提升定義位置，使用 useCallback) ---
-  const handlePointerDown = useCallback((e) => {
-    dragStatus.current.isDragging = true;
-    dragStatus.current.startX = e.clientX - manualOffset.x;
-    dragStatus.current.startY = e.clientY - manualOffset.y;
-  }, [manualOffset]);
+  /**
+   * 💡 核心修正：手動事件監聽器邏輯
+   * 我們不再使用 JSX 上的 onPointerDown，而是直接在 DOM 元素上綁定。
+   * 這樣可以徹底避開 Vite 打包混淆時產生的 ReferenceError。
+   */
+  useEffect(() => {
+    const el = mapRef.current;
+    if (!el) return;
 
-  const handlePointerMove = useCallback((e) => {
-    if (!dragStatus.current.isDragging) return;
-    const newX = e.clientX - dragStatus.current.startX;
-    const newY = e.clientY - dragStatus.current.startY;
-    setManualOffset({ x: newX, y: newY });
-  }, []);
+    // 手動定義處理函式 (不再依賴 JSX 名稱查找)
+    function onStart(e) {
+      dragStatus.current.isDragging = true;
+      dragStatus.current.startX = e.clientX - manualOffset.x;
+      dragStatus.current.startY = e.clientY - manualOffset.y;
+    }
 
-  const handlePointerUp = useCallback(() => {
-    dragStatus.current.isDragging = false;
-  }, []);
+    function onMove(e) {
+      if (!dragStatus.current.isDragging) return;
+      const newX = e.clientX - dragStatus.current.startX;
+      const newY = e.clientY - dragStatus.current.startY;
+      setManualOffset({ x: newX, y: newY });
+    }
+
+    function onEnd() {
+      dragStatus.current.isDragging = false;
+    }
+
+    el.addEventListener('pointerdown', onStart);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onEnd);
+    window.addEventListener('pointercancel', onEnd);
+
+    return () => {
+      el.removeEventListener('pointerdown', onStart);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onEnd);
+      window.removeEventListener('pointercancel', onEnd);
+    };
+  }, [manualOffset]); // 這裡需要依賴 manualOffset 來獲取正確的偏移量計算
 
   // 監聽視窗縮放
   useEffect(() => {
@@ -277,12 +301,7 @@ export default function App() {
   }
 
   return (
-    <div 
-      className="h-screen w-screen bg-slate-950 overflow-hidden relative touch-none select-none"
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
-    >
+    <div className="h-screen w-screen bg-slate-950 overflow-hidden relative touch-none select-none">
       {/* 頂部資訊欄 */}
       <div className="bg-white/95 backdrop-blur p-2 flex justify-between items-center z-50 relative border-b-2 border-slate-800">
         <div className="font-black px-3 py-1 bg-slate-900 text-white rounded-lg shadow-sm">房號: {roomId}</div>
@@ -294,13 +313,13 @@ export default function App() {
         </button>
       </div>
 
-      {/* 地圖區域 */}
+      {/* 地圖區域 - 💡 核心：使用 ref 而不是事件綁定 */}
       <div 
-        onPointerDown={handlePointerDown}
+        ref={mapRef}
         className="flex-grow relative w-full h-full cursor-grab active:cursor-grabbing overflow-hidden"
       >
         <div 
-          className="absolute top-0 left-0 origin-top-left transition-transform duration-700 ease-out" 
+          className="absolute top-0 left-0 origin-top-left transition-transform duration-700 ease-out pointer-events-none" 
           style={{ 
             width: `${MAP_SIZE}px`, height: `${MAP_SIZE}px`, 
             transform: `translate(${cameraOffset.x + manualOffset.x}px, ${cameraOffset.y + manualOffset.y}px) scale(${displayZoom})` 
