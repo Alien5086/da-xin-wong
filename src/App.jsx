@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, 
   AlertCircle, RefreshCw, HandCoins, DollarSign, 
@@ -6,7 +6,7 @@ import {
   Coins, Map, LocateFixed, Volume2, VolumeX, 
   Music, Users, Play, ChevronRight, Store, 
   Trophy, Timer, Gift, PlusCircle, MinusCircle, LogOut,
-  Target, Info, Building2, QrCode, Link2, Copy, Smartphone
+  Target, Info, Building2, QrCode, Link2, Copy, Smartphone, Star
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -17,47 +17,49 @@ import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken }
 
 // --- 1. 遊戲基礎資料 ---
 const BASE_MONEY = 17200; 
+const BASE_TRUST = 20;
+
 const BOARD_SQUARES = [
   { id: 0, name: '起點', type: 'START', desc: '經過得$500' },
-  { id: 1, name: '冰店', type: 'PROPERTY', price: 400, reqTrust: 12, color: 'bg-blue-200' },
-  { id: 2, name: '虛卡', type: 'CHANCE_BAD', color: 'bg-red-100' },
-  { id: 3, name: '飲料店', type: 'PROPERTY', price: 500, reqTrust: 12, color: 'bg-blue-200' },
-  { id: 4, name: '班費', type: 'TAX', amount: 200, color: 'bg-gray-200' },
-  { id: 5, name: '火車站', type: 'PROPERTY', price: 1800, reqTrust: 15, color: 'bg-gray-400' },
-  { id: 6, name: '小吃店', type: 'PROPERTY', price: 400, reqTrust: 12, color: 'bg-orange-200' },
-  { id: 7, name: '實卡', type: 'CHANCE_GOOD', color: 'bg-green-100' },
-  { id: 8, name: '麵包店', type: 'PROPERTY', price: 500, reqTrust: 12, color: 'bg-orange-200' },
-  { id: 9, name: '便利商店', type: 'PROPERTY', price: 600, reqTrust: 12, color: 'bg-orange-200' },
+  { id: 1, name: '冰店', type: 'PROPERTY', price: 400, reqTrust: 12, color: 'bg-blue-400' },
+  { id: 2, name: '虛卡', type: 'CHANCE_BAD', desc: '遺失錢包', effectM: -300, effectT: -2, color: 'bg-red-200' },
+  { id: 3, name: '飲料店', type: 'PROPERTY', price: 500, reqTrust: 12, color: 'bg-blue-400' },
+  { id: 4, name: '班費', type: 'TAX', amount: 200, color: 'bg-gray-300' },
+  { id: 5, name: '火車站', type: 'PROPERTY', price: 1800, reqTrust: 15, color: 'bg-gray-600' },
+  { id: 6, name: '小吃店', type: 'PROPERTY', price: 400, reqTrust: 12, color: 'bg-orange-400' },
+  { id: 7, name: '實卡', type: 'CHANCE_GOOD', desc: '扶老奶奶過馬路', effectM: 200, effectT: 3, color: 'bg-green-200' },
+  { id: 8, name: '麵包店', type: 'PROPERTY', price: 500, reqTrust: 12, color: 'bg-orange-400' },
+  { id: 9, name: '便利商店', type: 'PROPERTY', price: 600, reqTrust: 12, color: 'bg-orange-400' },
   { id: 10, name: '靜心房', type: 'JAIL', desc: '反省懺悔', color: 'bg-slate-300' },
-  { id: 11, name: '服飾店', type: 'PROPERTY', price: 700, reqTrust: 12, color: 'bg-pink-200' },
-  { id: 12, name: '超級市場', type: 'PROPERTY', price: 700, reqTrust: 12, color: 'bg-pink-200' },
-  { id: 13, name: '虛卡', type: 'CHANCE_BAD', color: 'bg-red-100' },
-  { id: 14, name: '鞋店', type: 'PROPERTY', price: 700, reqTrust: 0, color: 'bg-pink-200' },
-  { id: 15, name: '書局', type: 'PROPERTY', price: 800, reqTrust: 0, color: 'bg-yellow-200' },
-  { id: 16, name: '補習班', type: 'PROPERTY', price: 900, reqTrust: 12, color: 'bg-yellow-200' },
-  { id: 17, name: '實卡', type: 'CHANCE_GOOD', color: 'bg-green-100' },
-  { id: 18, name: '才藝班', type: 'PROPERTY', price: 900, reqTrust: 0, color: 'bg-yellow-200' },
-  { id: 19, name: '網咖', type: 'PROPERTY', price: 1600, reqTrust: 10, color: 'bg-purple-300' },
-  { id: 20, name: '道育班', type: 'FREE_PARKING', desc: '平安無事', color: 'bg-blue-100' },
-  { id: 21, name: '遊樂場', type: 'PROPERTY', price: 1100, reqTrust: 12, color: 'bg-teal-200' },
-  { id: 22, name: '博物館', type: 'PROPERTY', price: 1600, reqTrust: 12, color: 'bg-teal-200' },
-  { id: 23, name: '公園', type: 'PROPERTY', price: 1000, reqTrust: 12, color: 'bg-teal-200' },
-  { id: 24, name: '虛卡', type: 'CHANCE_BAD', color: 'bg-red-100' },
-  { id: 25, name: '美髮店', type: 'PROPERTY', price: 600, reqTrust: 0, color: 'bg-indigo-200' },
-  { id: 26, name: '實卡', type: 'CHANCE_GOOD', color: 'bg-green-100' },
-  { id: 27, name: '電力公司', type: 'PROPERTY', price: 2000, reqTrust: 15, color: 'bg-gray-400' },
-  { id: 28, name: '玩具店', type: 'PROPERTY', price: 700, reqTrust: 0, color: 'bg-indigo-200' },
-  { id: 29, name: '图書館', type: 'PROPERTY', price: 1500, reqTrust: 12, color: 'bg-indigo-200' },
+  { id: 11, name: '服飾店', type: 'PROPERTY', price: 700, reqTrust: 12, color: 'bg-pink-400' },
+  { id: 12, name: '超級市場', type: 'PROPERTY', price: 700, reqTrust: 12, color: 'bg-pink-400' },
+  { id: 13, name: '虛卡', type: 'CHANCE_BAD', desc: '隨地亂丟垃圾', effectM: -200, effectT: -3, color: 'bg-red-200' },
+  { id: 14, name: '鞋店', type: 'PROPERTY', price: 700, reqTrust: 0, color: 'bg-pink-400' },
+  { id: 15, name: '書局', type: 'PROPERTY', price: 800, reqTrust: 0, color: 'bg-yellow-400' },
+  { id: 16, name: '補習班', type: 'PROPERTY', price: 900, reqTrust: 12, color: 'bg-yellow-400' },
+  { id: 17, name: '實卡', type: 'CHANCE_GOOD', desc: '考試考一百分', effectM: 500, effectT: 2, color: 'bg-green-200' },
+  { id: 18, name: '才藝班', type: 'PROPERTY', price: 900, reqTrust: 0, color: 'bg-yellow-400' },
+  { id: 19, name: '網咖', type: 'PROPERTY', price: 1600, reqTrust: 10, color: 'bg-purple-500' },
+  { id: 20, name: '道育班', type: 'FREE_PARKING', desc: '平安無事', color: 'bg-blue-200' },
+  { id: 21, name: '遊樂場', type: 'PROPERTY', price: 1100, reqTrust: 12, color: 'bg-teal-400' },
+  { id: 22, name: '博物館', type: 'PROPERTY', price: 1600, reqTrust: 12, color: 'bg-teal-400' },
+  { id: 23, name: '公園', type: 'PROPERTY', price: 1000, reqTrust: 12, color: 'bg-teal-400' },
+  { id: 24, name: '虛卡', type: 'CHANCE_BAD', desc: '打破鄰居玻璃', effectM: -400, effectT: -2, color: 'bg-red-200' },
+  { id: 25, name: '美髮店', type: 'PROPERTY', price: 600, reqTrust: 0, color: 'bg-indigo-400' },
+  { id: 26, name: '實卡', type: 'CHANCE_GOOD', desc: '拾金不昧', effectM: 300, effectT: 5, color: 'bg-green-200' },
+  { id: 27, name: '電力公司', type: 'PROPERTY', price: 2000, reqTrust: 15, color: 'bg-gray-600' },
+  { id: 28, name: '玩具店', type: 'PROPERTY', price: 700, reqTrust: 0, color: 'bg-indigo-400' },
+  { id: 29, name: '图書館', type: 'PROPERTY', price: 1500, reqTrust: 12, color: 'bg-indigo-400' },
   { id: 30, name: '進入靜心房', type: 'GO_TO_JAIL', desc: '直接入獄', color: 'bg-slate-400' },
-  { id: 31, name: '虛卡', type: 'CHANCE_BAD', color: 'bg-red-100' },
-  { id: 32, name: '學校', type: 'PROPERTY', price: 1800, reqTrust: 15, color: 'bg-green-300' },
-  { id: 33, name: '植物園', type: 'PROPERTY', price: 1400, reqTrust: 12, color: 'bg-green-300' },
-  { id: 34, name: '美術館', type: 'PROPERTY', price: 1500, reqTrust: 12, color: 'bg-green-300' },
-  { id: 35, name: '科博館', type: 'PROPERTY', price: 1600, reqTrust: 12, color: 'bg-green-300' },
-  { id: 36, name: '實卡', type: 'CHANCE_GOOD', color: 'bg-green-100' },
-  { id: 37, name: '孔廟', type: 'PROPERTY', price: 1900, reqTrust: 15, color: 'bg-red-200' },
-  { id: 38, name: '學費', type: 'TAX', amount: 500, color: 'bg-gray-200' },
-  { id: 39, name: '自來水廠', type: 'PROPERTY', price: 2000, reqTrust: 15, color: 'bg-gray-400' },
+  { id: 31, name: '虛卡', type: 'CHANCE_BAD', desc: '上課遲到', effectM: -100, effectT: -2, color: 'bg-red-200' },
+  { id: 32, name: '學校', type: 'PROPERTY', price: 1800, reqTrust: 15, color: 'bg-green-400' },
+  { id: 33, name: '植物園', type: 'PROPERTY', price: 1400, reqTrust: 12, color: 'bg-green-400' },
+  { id: 34, name: '美術館', type: 'PROPERTY', price: 1500, reqTrust: 12, color: 'bg-green-400' },
+  { id: 35, name: '科博館', type: 'PROPERTY', price: 1600, reqTrust: 12, color: 'bg-green-400' },
+  { id: 36, name: '實卡', type: 'CHANCE_GOOD', desc: '當選模範生', effectM: 1000, effectT: 5, color: 'bg-green-200' },
+  { id: 37, name: '孔廟', type: 'PROPERTY', price: 1900, reqTrust: 15, color: 'bg-red-400' },
+  { id: 38, name: '學費', type: 'TAX', amount: 500, color: 'bg-gray-300' },
+  { id: 39, name: '自來水廠', type: 'PROPERTY', price: 2000, reqTrust: 15, color: 'bg-gray-600' },
 ];
 
 const GRID_ORDER = (() => {
@@ -107,15 +109,6 @@ const formatTime = (seconds) => {
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-const getOwnerBgColor = (colorClass) => {
-  const map = {
-    'bg-blue-500': 'bg-blue-300', 'bg-red-500': 'bg-red-300',
-    'bg-green-500': 'bg-green-300', 'bg-purple-500': 'bg-purple-300',
-    'bg-orange-500': 'bg-orange-300', 'bg-pink-500': 'bg-pink-300',
-  };
-  return map[colorClass] || 'bg-gray-300';
-};
-
 // --- 4. 主程式組件 ---
 export default function App() {
   const [appPhase, setAppPhase] = useState('LANDING'); 
@@ -127,7 +120,7 @@ export default function App() {
 
   const [gameData, setGameData] = useState({
     players: [], currentPlayerIdx: 0, properties: {},
-    gameState: 'IDLE', timeLeft: 0, diceVals: [1, 1], remainingSteps: 0
+    gameState: 'IDLE', timeLeft: 0, diceVals: [1, 1], actionMessage: ''
   });
 
   const [zoom, setZoom] = useState(0.8);
@@ -136,12 +129,11 @@ export default function App() {
   const [viewportSize, setViewportSize] = useState({ w: 800, h: 600 });
   const [isFullMapMode, setIsFullMapMode] = useState(false);
 
-  // 拖拽狀態
   const dragStatus = useRef({ isDragging: false, startX: 0, startY: 0 });
   const mapRef = useRef(null);
   const MAP_SIZE = 1600;
 
-  // --- 手動地圖拖曳 ---
+  // --- 手動地圖拖曳 (防報錯機制) ---
   useEffect(() => {
     const el = mapRef.current;
     if (!el) return;
@@ -187,7 +179,7 @@ export default function App() {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
-          if (firebaseConfig.apiKey.includes("請貼上")) throw new Error("INVALID_KEY");
+          if (firebaseConfig.apiKey.includes("請貼上") || firebaseConfig.apiKey.includes("填入")) throw new Error("INVALID_KEY");
           await signInAnonymously(auth);
         }
         setErrorMsg(null);
@@ -197,7 +189,7 @@ export default function App() {
         } else if (retries > 0) {
           setTimeout(() => initAuth(retries - 1), 1500); 
         } else {
-          setErrorMsg("網路連線失敗。");
+          setErrorMsg("網路連線失敗，請檢查金鑰或關閉廣告阻擋器。");
         }
       }
     };
@@ -215,8 +207,25 @@ export default function App() {
     });
   }, [user, roomId, appPhase]);
 
-  // --- 視角跟隨 ---
-  const displayZoom = isFullMapMode ? Math.min(viewportSize.w / MAP_SIZE, viewportSize.h / MAP_SIZE) * 0.7 : zoom;
+  // --- 對焦與視角跟隨 ---
+  const focusOnCurrentPlayer = useCallback(() => {
+    setIsFullMapMode(false);
+    const currP = gameData.players[gameData.currentPlayerIdx];
+    if (!currP) return;
+
+    const displayZoom = zoom;
+    const { row, col } = GRID_ORDER[currP.pos];
+    const CELL_SIZE = MAP_SIZE / 11;
+    setCameraOffset({ 
+      x: viewportSize.w / 2 - ((col - 1) * CELL_SIZE + CELL_SIZE / 2) * displayZoom, 
+      y: viewportSize.h / 2 - ((row - 1) * CELL_SIZE + CELL_SIZE / 2) * displayZoom 
+    });
+    setManualOffset({ x: 0, y: 0 }); // 重置手動拖曳
+  }, [gameData.players, gameData.currentPlayerIdx, viewportSize, zoom]);
+
+  const displayZoom = isFullMapMode ? Math.min(viewportSize.w / MAP_SIZE, viewportSize.h / MAP_SIZE) * 0.9 : zoom;
+  
+  // 自動跟隨回合切換
   useEffect(() => {
     if (appPhase !== 'GAME' || isFullMapMode) {
       if (isFullMapMode) {
@@ -224,19 +233,12 @@ export default function App() {
           x: viewportSize.w / 2 - (MAP_SIZE / 2) * displayZoom, 
           y: viewportSize.h / 2 - (MAP_SIZE / 2) * displayZoom 
         });
+        setManualOffset({ x: 0, y: 0 });
       }
       return;
     }
-    const currP = gameData.players[gameData.currentPlayerIdx];
-    if (!currP) return;
-
-    const { row, col } = GRID_ORDER[currP.pos];
-    const CELL_SIZE = MAP_SIZE / 11;
-    setCameraOffset({ 
-      x: viewportSize.w / 2 - ((col - 1) * CELL_SIZE + CELL_SIZE / 2) * displayZoom, 
-      y: viewportSize.h / 2 - ((row - 1) * CELL_SIZE + CELL_SIZE / 2) * displayZoom 
-    });
-  }, [gameData.currentPlayerIdx, isFullMapMode, displayZoom, viewportSize, appPhase]);
+    focusOnCurrentPlayer();
+  }, [gameData.currentPlayerIdx, gameData.players[gameData.currentPlayerIdx]?.pos, isFullMapMode, displayZoom, viewportSize, appPhase, focusOnCurrentPlayer]);
 
   // --- 房間邏輯 ---
   const createRoom = async (count) => {
@@ -245,11 +247,11 @@ export default function App() {
     const players = Array.from({ length: count }).map((_, i) => ({
       id: i, name: `玩家 ${i + 1}`, icon: CHILD_AVATARS[i],
       color: ['bg-blue-500', 'bg-red-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'][i],
-      pos: 0, money: BASE_MONEY, uid: i === 0 ? user.uid : null
+      pos: 0, money: BASE_MONEY, trust: BASE_TRUST, uid: i === 0 ? user.uid : null
     }));
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
-        players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: 600, properties: {}
+        players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: 600, properties: {}, actionMessage: ''
       });
       setRoomId(id); setIsHost(true); setMyPlayerIndex(0); setAppPhase('GAME');
     } catch (e) { setErrorMsg("建立失敗，請確認 Firebase 設定。"); }
@@ -271,10 +273,9 @@ export default function App() {
   };
 
   // ==========================================
-  // 🎲 遊戲核心邏輯 (本次修復重點！)
+  // 🎲 完整遊戲核心邏輯
   // ==========================================
 
-  // 1. 擲骰子
   const handleRollDice = async () => {
     if (gameData.currentPlayerIdx !== myPlayerIndex) return;
 
@@ -285,29 +286,67 @@ export default function App() {
 
     let newPos = player.pos + steps;
     let newMoney = player.money;
+    let newTrust = player.trust;
+    let passedStart = false;
 
-    // 經過起點加薪
     if (newPos >= 40) {
       newPos = newPos % 40;
       newMoney += 500; 
+      passedStart = true;
     }
 
     const newPlayers = [...gameData.players];
-    newPlayers[myPlayerIndex] = { ...player, pos: newPos, money: newMoney };
+    newPlayers[myPlayerIndex] = { ...player, pos: newPos, money: newMoney, trust: newTrust };
+    
+    const sq = BOARD_SQUARES[newPos];
+    let nextState = 'ACTION';
+    let msg = passedStart ? '經過起點，獲得 $500！\n' : '';
+
+    if (sq.type === 'TAX') {
+      newPlayers[myPlayerIndex].money -= sq.amount;
+      msg += `繳納${sq.name} $${sq.amount}。`;
+      nextState = 'END_TURN';
+    } else if (sq.type === 'CHANCE_GOOD' || sq.type === 'CHANCE_BAD') {
+      newPlayers[myPlayerIndex].money += sq.effectM;
+      newPlayers[myPlayerIndex].trust += sq.effectT;
+      msg += `抽中卡片：${sq.desc}！\n金錢 ${sq.effectM > 0 ? '+'+sq.effectM : sq.effectM}，信用 ${sq.effectT > 0 ? '+'+sq.effectT : sq.effectT}。`;
+      nextState = 'END_TURN';
+    } else if (sq.type === 'GO_TO_JAIL') {
+      newPlayers[myPlayerIndex].pos = 10;
+      msg += `直接進入靜心房反省！`;
+      nextState = 'END_TURN';
+    } else if (sq.type === 'PROPERTY') {
+      const ownerId = gameData.properties[newPos];
+      if (ownerId !== undefined && ownerId !== myPlayerIndex) {
+        const rent = Math.floor(sq.price * 0.4);
+        newPlayers[myPlayerIndex].money -= rent;
+        newPlayers[ownerId].money += rent;
+        msg += `踩到 ${gameData.players[ownerId].name} 的地盤，支付過路費 $${rent}。`;
+        nextState = 'END_TURN';
+      } else if (ownerId === undefined) {
+        msg += `來到空地：${sq.name}。`;
+      } else {
+        msg += `來到自己的土地。`;
+        nextState = 'END_TURN';
+      }
+    } else {
+      msg += `在 ${sq.name} 休息一天。`;
+      nextState = 'END_TURN';
+    }
 
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
       players: newPlayers,
       diceVals: [d1, d2],
-      gameState: 'ACTION' // 進入行動階段 (購買/付過路費)
+      gameState: nextState,
+      actionMessage: msg
     });
   };
 
-  // 2. 購買土地
   const handleBuyProperty = async () => {
     const player = gameData.players[myPlayerIndex];
     const sq = BOARD_SQUARES[player.pos];
 
-    if (player.money >= sq.price) {
+    if (player.money >= sq.price && player.trust >= sq.reqTrust) {
       const newPlayers = [...gameData.players];
       newPlayers[myPlayerIndex].money -= sq.price;
 
@@ -316,17 +355,18 @@ export default function App() {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
         players: newPlayers,
         properties: newProps,
-        gameState: 'END_TURN'
+        gameState: 'END_TURN',
+        actionMessage: `成功購買 ${sq.name}！`
       });
     }
   };
 
-  // 3. 結束回合
   const handleEndTurn = async () => {
     const nextIdx = (gameData.currentPlayerIdx + 1) % gameData.players.length;
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), {
       currentPlayerIdx: nextIdx,
-      gameState: 'IDLE' // 輪到下一位
+      gameState: 'IDLE',
+      actionMessage: ''
     });
   };
 
@@ -336,7 +376,7 @@ export default function App() {
       <div className="h-screen w-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center">
         <Smartphone size={80} className="text-blue-400 mb-4 animate-bounce" />
         <h1 className="text-4xl font-black mb-2">大信翁多人連線</h1>
-        <p className="text-slate-400 mb-8 font-bold text-sm">遊戲邏輯恢復版</p>
+        <p className="text-slate-400 mb-8 font-bold text-sm">經典 UI 完美回歸版</p>
         {errorMsg && <div className="mb-6 bg-red-600/30 p-4 rounded-xl border border-red-500 text-sm font-bold">{errorMsg}</div>}
         <div className="flex flex-col gap-4 w-full max-w-xs">
           <button disabled={!user} onClick={() => createRoom(4)} className={`py-4 rounded-2xl font-black text-xl shadow-xl transition ${!user ? 'bg-slate-700' : 'bg-blue-600'}`}>
@@ -354,21 +394,55 @@ export default function App() {
   const currentSquare = myPlayer ? BOARD_SQUARES[myPlayer.pos] : null;
 
   return (
-    <div className="h-screen w-screen bg-slate-950 overflow-hidden relative touch-none select-none">
-      <div className="bg-white/95 backdrop-blur p-2 flex justify-between items-center z-50 relative border-b-2 border-slate-800">
-        <div className="font-black px-3 py-1 bg-slate-900 text-white rounded-lg">房號: {roomId}</div>
-        <div className="font-mono font-bold text-lg bg-slate-100 px-4 py-1 rounded-full flex items-center gap-2">
-          {currentPlayer && <span className="text-sm mr-2 text-blue-600">輪到：{currentPlayer.name}</span>}
-          <Timer size={18} className={gameData.timeLeft < 60 ? "text-red-500 animate-pulse" : "text-slate-600"}/> {formatTime(gameData.timeLeft)}
+    <div className="h-screen w-screen bg-[#0a192f] overflow-hidden relative touch-none select-none">
+      
+      {/* 🌟 完美復刻：頂部玩家儀表板 */}
+      <div className="absolute top-4 left-4 right-20 z-50 flex gap-4 overflow-x-auto pb-4 px-2 pointer-events-auto items-center">
+        {/* 計時器 */}
+        <div className="bg-slate-800 text-white rounded-full px-5 py-2 flex items-center justify-center gap-2 font-mono font-bold shadow-lg h-14 shrink-0 border-2 border-slate-700">
+          <Timer size={18} className={gameData.timeLeft < 60 ? "text-red-400 animate-pulse" : "text-slate-300"}/> 
+          {formatTime(gameData.timeLeft)}
         </div>
-        <button onClick={() => { setIsFullMapMode(!isFullMapMode); setManualOffset({x:0, y:0}); }} className="p-2 bg-slate-200 rounded-lg">
-          {isFullMapMode ? <LocateFixed size={20}/> : <Map size={20}/>}
+        
+        {/* 玩家卡片列表 */}
+        {gameData.players.map(p => (
+          <div key={p.id} className={`flex items-center gap-3 px-4 py-2 rounded-2xl border-2 shadow-lg h-14 shrink-0 transition-all duration-300 ${gameData.currentPlayerIdx === p.id ? 'border-blue-500 bg-blue-50 scale-105' : 'border-slate-300 bg-white/90 opacity-80'}`}>
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xl shadow-sm ${p.color}`}>
+              {p.icon}
+            </div>
+            <div className="flex flex-col justify-center min-w-[80px]">
+              <div className="text-[11px] font-bold text-slate-500 flex justify-between items-center leading-tight mb-0.5">
+                <span>{p.name}</span>
+                {p.uid === user.uid && <span className="text-blue-500 ml-1">(你)</span>}
+              </div>
+              <div className="flex gap-2 items-baseline leading-none">
+                <span className="text-sm font-black text-emerald-600">${p.money}</span>
+                <span className="text-[10px] font-bold text-yellow-600 flex items-center gap-0.5"><Star size={10} fill="currentColor"/> {p.trust}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 🌟 完美復刻：右側浮動控制列 */}
+      <div className="absolute right-4 bottom-1/2 translate-y-1/2 flex flex-col gap-3 z-50 pointer-events-auto">
+        <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="w-12 h-12 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors border border-slate-200">
+          <ZoomIn size={24}/>
+        </button>
+        <button onClick={focusOnCurrentPlayer} className="w-12 h-12 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors border border-slate-200">
+          <Target size={24}/>
+        </button>
+        <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.4))} className="w-12 h-12 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors border border-slate-200">
+          <ZoomOut size={24}/>
+        </button>
+        <button onClick={() => setIsFullMapMode(!isFullMapMode)} className={`w-12 h-12 backdrop-blur rounded-full shadow-xl flex items-center justify-center transition-colors border ${isFullMapMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-white/90 text-slate-700 hover:bg-slate-50 border-slate-200'}`}>
+          <Map size={24}/>
         </button>
       </div>
 
       {/* 顯示擲骰結果 */}
       {gameData.gameState !== 'IDLE' && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-white/95 p-3 px-6 rounded-full shadow-2xl font-black text-2xl flex items-center gap-4 z-50 border-4 border-blue-500 animate-bounce">
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-white/95 p-3 px-6 rounded-full shadow-2xl font-black text-2xl flex items-center gap-4 z-50 border-4 border-blue-500 animate-bounce">
           🎲 {gameData.diceVals[0]} + {gameData.diceVals[1]} = {gameData.diceVals[0] + gameData.diceVals[1]} 步
         </div>
       )}
@@ -382,21 +456,48 @@ export default function App() {
             transform: `translate(${cameraOffset.x + manualOffset.x}px, ${cameraOffset.y + manualOffset.y}px) scale(${displayZoom})` 
           }}
         >
+          {/* 🌟 完美復刻：棋盤背景與間距 */}
           <div 
-            className="w-full h-full gap-1 p-2 bg-slate-300 rounded-lg shadow-inner"
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gridTemplateRows: 'repeat(11, 1fr)' }}
+            className="w-full h-full p-4 bg-[#c8e6c9] rounded-2xl shadow-2xl border-4 border-[#2e7d32]"
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gridTemplateRows: 'repeat(11, 1fr)', gap: '4px' }}
           >
             {BOARD_SQUARES.map((sq, idx) => {
               const {row, col} = GRID_ORDER[idx];
               const owner = gameData.players.find(p => gameData.properties?.[idx] === p.id);
               const playersHere = gameData.players.filter(p => p.pos === idx);
+              
+              // 🌟 完美復刻：文字方向排版
+              const isBottom = idx >= 1 && idx <= 9;
+              const isLeft = idx >= 11 && idx <= 19;
+              const isTop = idx >= 21 && idx <= 29;
+              const isRight = idx >= 31 && idx <= 39;
+              
+              let contentClass = "flex-1 flex flex-col items-center justify-center p-1 relative z-10 w-full";
+              if (isLeft) contentClass += " rotate-90";
+              else if (isTop) contentClass += " rotate-180";
+              else if (isRight) contentClass += " -rotate-90";
+
               return (
-                <div key={idx} className={`${owner ? getOwnerBgColor(owner.color) : 'bg-white'} rounded-lg relative border-2 border-slate-400`} style={{ gridRow: row, gridColumn: col }}>
-                  <div className="flex flex-col items-center justify-center h-full text-[10px] font-black leading-tight text-center p-0.5">
-                    <span className="truncate w-full">{sq.name}</span>
-                    {sq.price && <div className="text-blue-700 font-black">${sq.price}</div>}
+                // 🌟 完美復刻：厚實的卡片樣式與咖啡色底線
+                <div key={idx} className="bg-[#fffdf5] rounded-md relative flex flex-col overflow-hidden shadow-sm" style={{ gridRow: row, gridColumn: col, borderBottom: '5px solid #4a3424', borderRight: '1px solid #dcd3cb', borderLeft: '1px solid #dcd3cb', borderTop: '1px solid #dcd3cb' }}>
+                  
+                  {/* 土地顏色標籤 */}
+                  {sq.type === 'PROPERTY' && (
+                    <div className={`h-[25%] w-full ${owner ? getOwnerBgColor(owner.color) : sq.color} border-b border-black/10 z-0`}></div>
+                  )}
+
+                  <div className={contentClass}>
+                    <span className="font-black text-slate-800 text-[11px] leading-tight text-center">{sq.name}</span>
+                    {sq.price && <span className="text-blue-600 font-black text-[10px] leading-tight mt-0.5">${sq.price}</span>}
+                    {sq.reqTrust > 0 && (
+                      <div className="mt-1 bg-yellow-100 text-yellow-700 text-[8px] font-black px-1.5 py-0.5 rounded-full border border-yellow-300 flex items-center justify-center gap-0.5 shadow-sm">
+                        <Star size={8} fill="currentColor"/> {sq.reqTrust}
+                      </div>
+                    )}
                   </div>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+
+                  {/* 玩家棋子 */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                     {playersHere.map((p, pIdx) => (
                       <div key={p.id} className={`w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-xl shadow-xl transition-all duration-300 ${p.color} ${gameData.currentPlayerIdx === p.id ? 'z-30 scale-125 ring-4 ring-yellow-400' : 'z-10 opacity-90'}`} style={{ transform: `translate(${pIdx * 4}px, ${pIdx * 4}px)` }}>{p.icon}</div>
                     ))}
@@ -408,54 +509,42 @@ export default function App() {
         </div>
       </div>
 
-      <div className="fixed bottom-6 left-6 bg-slate-900/95 text-white p-4 rounded-3xl border border-white/20 flex items-center gap-4 z-50 shadow-2xl">
-        <div className={`w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-inner ${myPlayer?.color || 'bg-slate-700'}`}>{myPlayer?.icon || '❓'}</div>
-        <div>
-          <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-0.5">我的錢包</div>
-          <div className="text-2xl font-black">${myPlayer?.money || 0}</div>
-        </div>
-      </div>
-
-      {/* 🎮 遊戲控制面板 (已恢復) */}
+      {/* 🎮 遊戲控制面板 (置中或靠右下) */}
       {gameData.currentPlayerIdx === myPlayerIndex && (
-        <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col gap-3 z-50 pointer-events-auto">
           
           {/* 狀態 1：還沒擲骰子 */}
           {gameData.gameState === 'IDLE' && (
-            <button onClick={handleRollDice} className="w-28 h-28 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-3xl shadow-2xl animate-bounce border-8 border-white active:scale-90 transition-transform flex items-center justify-center">
-              擲骰
+            <button onClick={handleRollDice} className="px-10 py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-3xl shadow-[0_10px_0_0_#1e3a8a,0_15px_20px_rgba(0,0,0,0.4)] active:shadow-[0_0px_0_0_#1e3a8a,0_0px_0px_rgba(0,0,0,0.4)] active:translate-y-[10px] transition-all flex items-center gap-3 border-4 border-white animate-bounce">
+              <Dice5 size={32} /> 擲骰子
             </button>
           )}
 
-          {/* 狀態 2：移動完畢，選擇行動 */}
-          {gameData.gameState === 'ACTION' && (
-            <div className="bg-white p-5 rounded-3xl shadow-2xl flex flex-col gap-3 border-4 border-slate-800 animate-in slide-in-from-bottom">
-              <div className="font-black text-center text-slate-800 mb-1 border-b-2 pb-2">你來到了：<br/><span className="text-blue-600 text-xl">{currentSquare?.name}</span></div>
+          {/* 狀態 2 & 3：行動階段與結束確認 */}
+          {(gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && (
+            <div className="bg-white p-6 rounded-3xl shadow-2xl flex flex-col gap-4 border-4 border-slate-800 min-w-[280px]">
+              {gameData.actionMessage.split('\n').map((line, i) => (
+                <div key={i} className="font-black text-center text-slate-800 text-lg leading-snug">{line}</div>
+              ))}
               
-              {/* 如果是空地且錢夠，顯示購買按鈕 */}
-              {currentSquare?.type === 'PROPERTY' && !gameData.properties[myPlayer.pos] && (
+              <div className="border-t-2 border-slate-100 my-1"></div>
+
+              {/* 購買按鈕 */}
+              {gameData.gameState === 'ACTION' && currentSquare?.type === 'PROPERTY' && !gameData.properties[myPlayer.pos] && (
                 <button 
                   onClick={handleBuyProperty} 
-                  disabled={myPlayer.money < currentSquare.price}
-                  className={`font-black py-4 px-6 rounded-2xl active:scale-95 transition-transform ${myPlayer.money >= currentSquare.price ? 'bg-green-500 hover:bg-green-400 text-white shadow-lg' : 'bg-slate-200 text-slate-400'}`}
+                  disabled={myPlayer.money < currentSquare.price || myPlayer.trust < currentSquare.reqTrust}
+                  className={`font-black py-4 px-6 rounded-2xl active:scale-95 transition-transform text-lg ${myPlayer.money >= currentSquare.price && myPlayer.trust >= currentSquare.reqTrust ? 'bg-green-500 hover:bg-green-400 text-white shadow-lg' : 'bg-slate-200 text-slate-400'}`}
                 >
-                  購買 (${currentSquare.price})
+                  {myPlayer.trust < currentSquare.reqTrust ? `信用不足 (需 ${currentSquare.reqTrust})` : `購買土地 ($${currentSquare.price})`}
                 </button>
               )}
               
-              <button onClick={handleEndTurn} className="bg-slate-800 hover:bg-slate-700 text-white font-black py-4 px-6 rounded-2xl active:scale-95 transition-transform shadow-lg">
+              <button onClick={handleEndTurn} className="bg-slate-800 hover:bg-slate-700 text-white font-black py-4 px-6 rounded-2xl active:scale-95 transition-transform shadow-lg text-lg">
                 結束回合
               </button>
             </div>
           )}
-
-          {/* 狀態 3：已經購買完畢，只能結束 */}
-          {gameData.gameState === 'END_TURN' && (
-            <button onClick={handleEndTurn} className="w-28 h-28 bg-slate-800 hover:bg-slate-700 text-white rounded-full font-black text-xl shadow-2xl border-8 border-white active:scale-90 transition-transform flex flex-col items-center justify-center animate-pulse">
-              <span>結束</span><span>回合</span>
-            </button>
-          )}
-
         </div>
       )}
     </div>
