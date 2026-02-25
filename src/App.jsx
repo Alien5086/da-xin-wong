@@ -952,13 +952,27 @@ export default function App() {
 
       {/* 🌟 遊戲控制區：左下角資產管理 */}
       <div className="absolute bottom-6 left-6 z-50 pointer-events-auto">
-         <button onClick={() => setShowAssetManager(!showAssetManager)} className={`p-4 rounded-full shadow-2xl font-black text-lg transition border-4 ${showAssetManager ? 'bg-orange-500 text-white border-orange-300' : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-50'}`}>
-            <Briefcase size={28}/>
-         </button>
+         {/* 🌟 恢復並升級：小金庫 (錢包) 操作面板 */}
+         <div 
+            onClick={() => setShowAssetManager(!showAssetManager)}
+            className="bg-slate-900/95 backdrop-blur-md text-white p-4 pr-6 rounded-3xl border-2 border-slate-700 flex items-center gap-5 shadow-2xl cursor-pointer hover:bg-slate-800 transition-colors"
+         >
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-4xl shadow-inner border-2 border-white/20 ${myPlayer?.color || 'bg-slate-700'} ${myPlayer?.isBankrupt ? 'grayscale' : ''}`}>
+               {myPlayer?.icon || '❓'}
+            </div>
+            <div>
+               <div className="text-sm font-black text-orange-400 uppercase tracking-widest mb-0.5 flex items-center gap-1.5">
+                  <Briefcase size={18}/> 小金庫面板
+               </div>
+               <div className="text-3xl font-black tracking-wider text-emerald-400">
+                  ${myPlayer?.money || 0}
+               </div>
+            </div>
+         </div>
 
-         {/* 資產管理面板 */}
+         {/* 資產管理面板 (由小金庫點擊彈出) */}
          {showAssetManager && (
-            <div className="absolute bottom-20 left-0 bg-white p-6 rounded-3xl shadow-2xl border-4 border-slate-800 w-80 animate-in slide-in-from-bottom-4">
+            <div className="absolute bottom-[110%] left-0 bg-white p-6 rounded-3xl shadow-2xl border-4 border-slate-800 w-80 animate-in slide-in-from-bottom-4 mb-2">
                 <div className="flex justify-between items-center border-b-2 border-slate-100 pb-3 mb-4">
                     <h3 className="font-black text-xl text-slate-800">💼 管理資產 {isOfflineMode && `(${myPlayer?.name})`}</h3>
                     <button onClick={() => setShowAssetManager(false)} className="text-slate-400 hover:text-slate-600 font-bold">關閉</button>
@@ -1002,29 +1016,29 @@ export default function App() {
          )}
       </div>
 
-      {/* 🌟 右側浮動控制列 */}
-      <div className="absolute right-4 bottom-1/2 translate-y-1/2 flex flex-col gap-3 z-50 pointer-events-auto">
-        <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="w-12 h-12 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors border border-slate-200">
-          <ZoomIn size={24}/>
+      {/* 🌟 右側浮動控制列 (放大版) */}
+      <div className="absolute right-6 bottom-1/2 translate-y-1/2 flex flex-col gap-4 z-50 pointer-events-auto">
+        <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="w-16 h-16 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors border-2 border-slate-200">
+          <ZoomIn size={32}/>
         </button>
-        <button onClick={focusOnCurrentPlayer} className="w-12 h-12 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors border border-slate-200">
-          <Target size={24}/>
+        <button onClick={focusOnCurrentPlayer} className="w-16 h-16 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors border-2 border-slate-200">
+          <Target size={32}/>
         </button>
-        <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.4))} className="w-12 h-12 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors border border-slate-200">
-          <ZoomOut size={24}/>
+        <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.4))} className="w-16 h-16 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors border-2 border-slate-200">
+          <ZoomOut size={32}/>
         </button>
-        <button onClick={() => setIsFullMapMode(!isFullMapMode)} className={`w-12 h-12 backdrop-blur rounded-full shadow-xl flex items-center justify-center transition-colors border ${isFullMapMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-white/90 text-slate-700 hover:bg-slate-50 border-slate-200'}`}>
-          <Map size={24}/>
+        <button onClick={() => setIsFullMapMode(!isFullMapMode)} className={`w-16 h-16 backdrop-blur rounded-full shadow-xl flex items-center justify-center transition-colors border-2 ${isFullMapMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-white/90 text-slate-700 hover:bg-slate-50 border-slate-200'}`}>
+          <Map size={32}/>
         </button>
         
-        <div className="w-8 h-[2px] bg-slate-600/30 mx-auto my-0.5 rounded-full"></div>
+        <div className="w-10 h-[3px] bg-slate-600/30 mx-auto my-1 rounded-full"></div>
 
-        <button onClick={() => setIsMuted(!isMuted)} className={`w-12 h-12 backdrop-blur rounded-full shadow-xl flex items-center justify-center transition-colors border ${isMuted ? 'bg-slate-700 text-white border-slate-600' : 'bg-white/90 text-slate-700 hover:bg-slate-50 hover:text-blue-600 border-slate-200'}`}>
-          {isMuted ? <VolumeX size={24}/> : <Volume2 size={24}/>}
+        <button onClick={() => setIsMuted(!isMuted)} className={`w-16 h-16 backdrop-blur rounded-full shadow-xl flex items-center justify-center transition-colors border-2 ${isMuted ? 'bg-slate-700 text-white border-slate-600' : 'bg-white/90 text-slate-700 hover:bg-slate-50 hover:text-blue-600 border-slate-200'}`}>
+          {isMuted ? <VolumeX size={32}/> : <Volume2 size={32}/>}
         </button>
 
-        <button onClick={() => setShowExitConfirm(true)} className="w-12 h-12 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors border border-red-200 mt-1">
-          <LogOut size={24} className="ml-1"/>
+        <button onClick={() => setShowExitConfirm(true)} className="w-16 h-16 bg-white/90 backdrop-blur rounded-full shadow-xl flex items-center justify-center text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors border-2 border-red-200 mt-2">
+          <LogOut size={32} className="ml-1"/>
         </button>
       </div>
 
