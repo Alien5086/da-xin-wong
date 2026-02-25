@@ -719,7 +719,7 @@ export default function App() {
   // ==========================================
   if (appPhase === 'LANDING') {
     return (
-      <div className="h-screen w-full bg-[#fdf6e3] flex flex-col items-center justify-center p-6 text-slate-800">
+      <div className="min-h-screen w-screen bg-[#fdf6e3] flex flex-col items-center justify-center p-6 text-slate-800 overflow-x-hidden absolute inset-0">
         <h1 className="text-5xl font-black mb-8 text-orange-600 tracking-widest drop-shadow-sm">信實人生大轉盤</h1>
         
         {errorMsg && <div className="mb-6 bg-red-100 text-red-600 p-4 rounded-xl font-bold border border-red-200">{errorMsg}</div>}
@@ -884,7 +884,7 @@ export default function App() {
      });
 
      return (
-        <div className="h-screen w-full bg-[#0f172a] flex flex-col items-center justify-center p-6 text-white text-center">
+        <div className="min-h-screen w-screen bg-[#0f172a] flex flex-col items-center justify-center p-6 text-white text-center overflow-x-hidden absolute inset-0">
             <Trophy size={100} className="text-yellow-400 mb-6 animate-bounce" />
             <h1 className="text-6xl font-black mb-10 text-yellow-400 drop-shadow-lg">遊戲結束</h1>
             <div className="bg-slate-800 p-8 rounded-3xl w-full max-w-lg shadow-2xl border-4 border-slate-700">
