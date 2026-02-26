@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, 
-  AlertCircle, RefreshCw, HandCoins, DollarSign, 
-  ShieldAlert, ZoomIn, ZoomOut, UserRound, 
-  Coins, Map, LocateFixed, Volume2, VolumeX, 
-  Music, Users, Play, ChevronRight, Store, 
-  Trophy, Timer, Gift, PlusCircle, MinusCircle, LogOut,
-  Target, Info, Building2, QrCode, Link2, Copy, Smartphone, Star, Clock, Users as UsersIcon,
-  Briefcase, Wallet, X, PartyPopper
+  Timer, Target, Volume2, VolumeX, 
+  LogOut, Star, Users as UsersIcon, Clock,
+  Briefcase, X, PartyPopper, Menu
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -68,7 +64,7 @@ const BOARD_SQUARES = [
   { id: 26, name: '實卡', type: 'CHANCE_GOOD', color: 'bg-emerald-200' },
   { id: 27, name: '電力公司', type: 'PROPERTY', price: 2000, reqTrust: 15, color: 'bg-slate-300' },
   { id: 28, name: '玩具店', type: 'PROPERTY', price: 700, reqTrust: 0, color: 'bg-indigo-300' },
-  { id: 29, name: '图書館', type: 'PROPERTY', price: 1500, reqTrust: 12, color: 'bg-indigo-300' },
+  { id: 29, name: '圖書館', type: 'PROPERTY', price: 1500, reqTrust: 12, color: 'bg-indigo-300' },
   { id: 30, name: '進入靜心房', type: 'GO_TO_JAIL', desc: '直接入獄', color: 'bg-fuchsia-300' },
   { id: 31, name: '虛卡', type: 'CHANCE_BAD', color: 'bg-rose-200' },
   { id: 32, name: '學校', type: 'PROPERTY', price: 1800, reqTrust: 15, color: 'bg-emerald-300' },
@@ -120,8 +116,9 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
 
+// =========================================================
 
-// 🌟 修復 4：Web Audio API 延遲初始化 (解決 iOS 沒聲音的問題)
+// 🌟 Web Audio API 音效
 let audioCtx = null;
 const playSound = (type, isMuted) => {
   if (isMuted || typeof window === 'undefined') return;
@@ -192,7 +189,7 @@ const DiceIcon = ({ value, ...props }) => {
   return <Icon {...props} />;
 };
 
-// 🌟 全新升級：擬真 3D 半月筊杯組件
+// 🌟 擬真 3D 半月筊杯組件
 const BweiBlock = ({ isFlat, className = "" }) => {
   return (
     <div className={`relative ${className}`}>
@@ -204,7 +201,6 @@ const BweiBlock = ({ isFlat, className = "" }) => {
       ) : (
         // 陰面 (凸的，朝上)：深暗紅色，右側圓弧邊帶有暗角陰影與立體反光高光
         <div className="w-[32px] h-[75px] bg-[#be123c] border-[2px] border-[#881337] rounded-r-[40px] rounded-l-[6px] shadow-[inset_-6px_0_10px_rgba(0,0,0,0.5)] drop-shadow-xl relative overflow-hidden">
-           {/* 🌟 弧面立體高光 (反光條)，製造圓潤凸起的錯覺 */}
            <div className="absolute top-2 bottom-2 right-1.5 w-[6px] bg-white/40 rounded-full blur-[2px]"></div>
            <div className="absolute top-4 bottom-4 right-2.5 w-[2px] bg-white/60 rounded-full blur-[0.5px]"></div>
         </div>
@@ -222,7 +218,6 @@ export default function App() {
   const [setupTimeLimit, setSetupTimeLimit] = useState(600);
   const [setupAvatar, setSetupAvatar] = useState(CHILD_AVATARS[0]);
   
-  // 🌟 新增：用來儲存玩家自訂名字的 State
   const [setupName, setSetupName] = useState('玩家 1');
   const [localNames, setLocalNames] = useState(['玩家 1', '玩家 2', '玩家 3', '玩家 4', '玩家 5', '玩家 6']);
 
@@ -238,6 +233,7 @@ export default function App() {
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const bgmRef = useRef(null);
   const [bgmStarted, setBgmStarted] = useState(false);
@@ -354,21 +350,19 @@ export default function App() {
     }
   }, []);
 
+  // 🌟 強制性 Auth 初始化流程
   useEffect(() => {
-    const initAuth = async (retries = 3) => {
+    const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
-          if (firebaseConfig.apiKey.includes("請貼上") || firebaseConfig.apiKey.includes("填入")) throw new Error("INVALID_KEY");
           await signInAnonymously(auth);
         }
         setErrorMsg(null);
       } catch (e) {
-        if (e.message === "INVALID_KEY") {
-          setErrorMsg("請在 App.jsx 填入您真實的 Firebase API_KEY！(單機模式可忽略)");
-        } else if (retries > 0) {
-          setTimeout(() => initAuth(retries - 1), 1500); 
+        if (firebaseConfig.apiKey && (firebaseConfig.apiKey.includes("請貼上") || firebaseConfig.apiKey.includes("填入"))) {
+          setErrorMsg("請確認 Firebase API_KEY！(單機模式可忽略)");
         } else {
           setErrorMsg("網路連線失敗，請檢查金鑰或關閉廣告阻擋器。");
         }
@@ -446,7 +440,7 @@ export default function App() {
     setIsOfflineMode(true);
     const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
       id: i, 
-      name: localNames[i].trim() || `玩家 ${i + 1}`, // 🌟 套用自訂名字，如果空白則用預設
+      name: localNames[i].trim() || `玩家 ${i + 1}`,
       icon: localAvatars[i], 
       color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
       pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
@@ -469,7 +463,7 @@ export default function App() {
     const id = Math.random().toString(36).substring(2, 8).toUpperCase();
     const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
       id: i, 
-      name: i === 0 ? (setupName.trim() || '房主') : `玩家 ${i + 1}`, // 🌟 套用房主自訂名字
+      name: i === 0 ? (setupName.trim() || '房主') : `玩家 ${i + 1}`,
       icon: i === 0 ? setupAvatar : '⏳', 
       color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i],
       pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
@@ -494,7 +488,6 @@ export default function App() {
       if (!snap.exists()) { setErrorMsg("找不到房號！"); return; }
       const data = snap.data();
       
-      // 🌟 修復 1：斷線重連機制。如果玩家本來就在房間裡，直接恢復座位與畫面！
       const existingSlot = data.players.findIndex(p => p.uid === user.uid);
       if (existingSlot !== -1) {
         setMyPlayerIndex(existingSlot);
@@ -508,7 +501,7 @@ export default function App() {
       
       data.players[slot].uid = user.uid;
       data.players[slot].icon = setupAvatar;
-      data.players[slot].name = setupName.trim() || `玩家 ${slot + 1}`; // 🌟 套用加入者的名字
+      data.players[slot].name = setupName.trim() || `玩家 ${slot + 1}`;
       data.players[slot].inJail = false; 
       
       await updateDoc(roomRef, { players: data.players });
@@ -643,7 +636,6 @@ export default function App() {
          newPlayers[activePlayerIndex].pos = 10;
          newPlayers[activePlayerIndex].inJail = true;
          newPlayers[activePlayerIndex].jailRoundsLeft = -1; 
-         // 🌟 更新：抽卡進入靜心室的文字
          msg += `好好的懺悔反省 🙏\n請誠心擲杯問神明。`;
          nextState = 'JAIL_BWA_BWEI'; 
       } else {
@@ -659,7 +651,6 @@ export default function App() {
       newPlayers[activePlayerIndex].pos = 10;
       newPlayers[activePlayerIndex].inJail = true;
       newPlayers[activePlayerIndex].jailRoundsLeft = -1; 
-      // 🌟 更新：走到靜心室的文字
       msg += `好好的懺悔反省 🙏\n請誠心擲杯問神明。`;
       nextState = 'JAIL_BWA_BWEI'; 
     } else if (sq.type === 'PROPERTY') {
@@ -733,7 +724,7 @@ export default function App() {
           gameState: 'JAIL_BWA_BWEI',
           bwaBweiResults: newResults
         });
-      }, 1000); // 動畫時間稍微延長，讓空中翻滾更好看
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [gameData.gameState, gameData.currentPlayerIdx, activePlayerIndex, gameData.bwaBweiResults, isOfflineMode, roomId]);
@@ -742,7 +733,6 @@ export default function App() {
     const newPlayers = [...gameData.players];
     const holyCount = (gameData.bwaBweiResults || []).filter(r => r === 'HOLY').length;
     
-    // 🌟 移除骰子圖案，並精簡換行，讓結果在一行內俐落呈現
     let msg = `總共擲出【 ${holyCount} 次聖杯 】\n`;
     if (holyCount === 3) {
       playSound('win', isMuted); 
@@ -874,7 +864,6 @@ export default function App() {
           nextState = 'END_TURN';
       }
 
-      // 🌟 修復 2：提早獲勝檢查。如果場上（已加入的玩家中）只剩一人沒破產，直接結束遊戲！
       const joinedPlayers = bankruptCheck.newPlayers.filter(p => (isOfflineMode || p.uid !== null));
       const alivePlayers = joinedPlayers.filter(p => !p.isBankrupt);
       if (joinedPlayers.length > 1 && alivePlayers.length <= 1) {
@@ -892,12 +881,15 @@ export default function App() {
   };
 
 
-  // ==========================================
-  // 🎨 畫面渲染區 (糖果泡泡風格)
-  // ==========================================
   if (appPhase === 'LANDING') {
     return (
       <div className="min-h-screen w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-4 md:p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
+        <style>{`
+          .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+          .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+          .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        `}</style>
         
         <div className="absolute top-10 left-10 w-32 h-32 bg-white/40 rounded-full blur-xl animate-pulse"></div>
         <div className="absolute bottom-20 right-20 w-48 h-48 bg-pink-300/20 rounded-full blur-2xl animate-pulse delay-700"></div>
@@ -962,7 +954,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 右側：專屬角色設定 */}
                 <div className="flex-[1.2] flex flex-col">
                   {setupMode === 'LOCAL' ? (
                     <div className="w-full bg-sky-50 rounded-[2rem] p-4 md:p-5 border-4 border-white shadow-sm h-full flex flex-col">
@@ -976,20 +967,18 @@ export default function App() {
                             >
                               {localAvatars[i]}
                             </button>
-                            {/* 🌟 顯示該玩家目前設定的名字 */}
                             <span className="text-[10px] md:text-xs text-sky-600 bg-white px-2 py-0.5 rounded-full border-2 border-sky-100 max-w-[60px] truncate">{localNames[i]}</span>
                           </div>
                         ))}
                       </div>
 
-                      {/* 🌟 新增：名字輸入框 */}
                       <div className="mb-3 w-full max-w-[200px] mx-auto">
                         <input 
                           type="text" 
                           value={localNames[editingLocalPlayer]} 
                           onChange={e => {
                             const newNames = [...localNames];
-                            newNames[editingLocalPlayer] = e.target.value.substring(0, 6); // 限制6個字
+                            newNames[editingLocalPlayer] = e.target.value.substring(0, 6);
                             setLocalNames(newNames);
                           }} 
                           placeholder={`玩家 ${editingLocalPlayer + 1} 名字`}
@@ -1020,7 +1009,6 @@ export default function App() {
                     <div className="w-full bg-sky-50 rounded-[2rem] p-5 md:p-6 border-4 border-white shadow-sm h-full flex flex-col justify-center">
                       <div className="text-center text-sky-800 mb-2 md:mb-3 text-lg md:text-xl">你的專屬角色與名字！</div>
                       
-                      {/* 🌟 新增：名字輸入框 */}
                       <div className="mb-4 w-full max-w-[200px] mx-auto">
                         <input 
                           type="text" 
@@ -1068,7 +1056,6 @@ export default function App() {
                   <div className="w-full bg-sky-50 rounded-[2rem] p-5 border-4 border-white shadow-sm h-full flex flex-col justify-center">
                     <div className="text-center text-sky-800 mb-2 md:mb-3 text-lg md:text-xl">你的專屬角色與名字！</div>
                     
-                    {/* 🌟 新增：名字輸入框 */}
                     <div className="mb-4 w-full max-w-[200px] mx-auto">
                       <input 
                         type="text" 
@@ -1147,11 +1134,15 @@ export default function App() {
   
   const safeDice = displayDice || [1, 1];
 
-  // 🌟 主畫面
   return (
     <div className="h-screen w-screen bg-[#e0f2fe] overflow-hidden relative touch-none select-none font-black text-[#4a3424] flex flex-col">
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      `}</style>
       
-      {/* 🌟 頂部玩家儀表板 */}
       <div className="absolute top-6 left-6 right-24 z-[150] flex gap-4 overflow-x-auto pb-6 px-2 pointer-events-auto items-center custom-scrollbar">
         
         <div className="bg-white text-rose-500 rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center shadow-md h-[75px] shrink-0 border-4 border-rose-200">
@@ -1189,33 +1180,40 @@ export default function App() {
         ))}
       </div>
 
-      {/* 🌟 右側浮動控制列 */}
-      <div className="absolute right-6 bottom-1/2 translate-y-1/2 flex flex-col gap-5 z-[150] pointer-events-auto">
-        <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100">
-          <ZoomIn size={28} strokeWidth={3}/>
-        </button>
-        <button onClick={focusOnCurrentPlayer} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100">
-          <Target size={28} strokeWidth={3}/>
-        </button>
-        <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.4))} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100">
-          <ZoomOut size={28} strokeWidth={3}/>
-        </button>
-        <button onClick={() => setIsFullMapMode(!isFullMapMode)} className={`w-16 h-16 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 ${isFullMapMode ? 'bg-sky-400 text-white border-white scale-110' : 'bg-white/90 text-sky-500 hover:scale-110 active:scale-95 border-sky-100'}`}>
-          <Map size={28} strokeWidth={3}/>
-        </button>
-        
-        <div className="w-8 h-1.5 bg-sky-200/50 mx-auto my-1 rounded-full"></div>
+      <div className="absolute right-6 bottom-1/2 translate-y-1/2 flex flex-col items-center z-[150] pointer-events-auto">
+        <div className={`flex flex-col items-center gap-3 overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-[500px] opacity-100 py-2' : 'max-h-0 opacity-0 py-0 pointer-events-none'}`}>
+          <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="w-14 h-14 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button onClick={focusOnCurrentPlayer} className="w-14 h-14 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
+            <Target size={24} strokeWidth={3}/>
+          </button>
+          <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.4))} className="w-14 h-14 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button onClick={() => setIsFullMapMode(!isFullMapMode)} className={`w-14 h-14 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 shrink-0 ${isFullMapMode ? 'bg-sky-400 text-white border-white scale-110' : 'bg-white/90 text-sky-500 hover:scale-110 active:scale-95 border-sky-100'}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+          </button>
+          
+          <div className="w-6 h-1.5 bg-sky-200/50 mx-auto my-0.5 rounded-full shrink-0"></div>
 
-        <button onClick={() => setIsMuted(!isMuted)} className={`w-16 h-16 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 ${isMuted ? 'bg-slate-300 text-slate-600 border-white' : 'bg-white/90 text-amber-500 hover:scale-110 active:scale-95 border-amber-100'}`}>
-          {isMuted ? <VolumeX size={28} strokeWidth={3}/> : <Volume2 size={28} strokeWidth={3}/>}
-        </button>
+          <button onClick={() => setIsMuted(!isMuted)} className={`w-14 h-14 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 shrink-0 ${isMuted ? 'bg-slate-300 text-slate-600 border-white' : 'bg-white/90 text-amber-500 hover:scale-110 active:scale-95 border-amber-100'}`}>
+            {isMuted ? <VolumeX size={24} strokeWidth={3}/> : <Volume2 size={24} strokeWidth={3}/>}
+          </button>
 
-        <button onClick={() => setShowExitConfirm(true)} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-rose-400 hover:bg-rose-50 hover:scale-110 active:scale-95 transition-all border-4 border-rose-100 mt-2">
-          <LogOut size={28} strokeWidth={3} className="ml-1"/>
+          <button onClick={() => setShowExitConfirm(true)} className="w-14 h-14 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-rose-400 hover:bg-rose-50 hover:scale-110 active:scale-95 transition-all border-4 border-rose-100 shrink-0">
+            <LogOut size={24} strokeWidth={3} className="ml-1"/>
+          </button>
+        </div>
+
+        <button 
+          onClick={() => setIsMenuOpen(!isMenuOpen)} 
+          className={`w-16 h-16 rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center justify-center transition-all duration-300 border-4 mt-2 z-10 ${isMenuOpen ? 'bg-sky-400 text-white border-white rotate-90' : 'bg-white/90 backdrop-blur-md text-sky-500 border-sky-100 hover:scale-110'}`}
+        >
+          {isMenuOpen ? <X size={28} strokeWidth={3} /> : <Menu size={28} strokeWidth={3} />}
         </button>
       </div>
 
-      {/* 🌟 退出確認視窗 */}
       {showExitConfirm && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto">
           <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full mx-4 animate-in zoom-in-95 spin-in-1 border-[8px] border-rose-100">
@@ -1230,7 +1228,6 @@ export default function App() {
         </div>
       )}
 
-      {/* 🌟 點擊地圖格子彈出的產權資訊面板 */}
       {selectedSquareInfo !== null && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setSelectedSquareInfo(null)}>
           <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 w-full max-w-sm animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative" onClick={e => e.stopPropagation()}>
@@ -1295,7 +1292,6 @@ export default function App() {
         </div>
       )}
 
-      {/* 🌟 點擊玩家頭像彈出的金庫與資產管理面板 */}
       {showAssetManager && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setShowAssetManager(false)}>
           <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-amber-100 w-full max-w-sm animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative" onClick={e => e.stopPropagation()}>
@@ -1358,11 +1354,9 @@ export default function App() {
         </div>
       )}
 
-      {/* 🌟 獨立的動作與訊息通知面板 (固定於畫面底部) */}
       {gameData.currentPlayerIdx === activePlayerIndex && !myPlayer?.isBankrupt && ['JAIL_BWA_BWEI', 'ACTION', 'END_TURN'].includes(gameData.gameState) && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[250] bg-white/95 backdrop-blur-md p-10 rounded-[3rem] shadow-[0_25px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 min-w-[380px] max-w-[95vw] text-center animate-in slide-in-from-bottom-8 duration-300 pointer-events-auto flex flex-col items-center gap-6">
           
-          {/* 🌟 靜心房：擬真擲杯結果顯示區 */}
           {gameData.gameState === 'JAIL_BWA_BWEI' && (
             <div className="flex flex-col items-center w-full px-2">
               <div className="text-3xl font-black text-rose-500 drop-shadow-sm mb-6 bg-rose-50 px-6 py-2 rounded-full border-4 border-white shadow-sm">🚨 反省泡泡時間</div>
@@ -1384,7 +1378,6 @@ export default function App() {
                   return (
                     <div key={i} className={`w-[90px] h-[110px] rounded-[2rem] flex flex-col items-center justify-center border-4 animate-in zoom-in spin-in-12 ${c.color} transition-all`}>
                       <div className="flex items-center justify-center gap-2 mb-2">
-                         {/* 🌟 讓兩片半月筊杯對稱排列，完美還原真實落地模樣 */}
                          {res === 'HOLY' && (
                            <>
                              <BweiBlock isFlat={true} className="rotate-[15deg] scale-75" />
@@ -1457,7 +1450,6 @@ export default function App() {
         </div>
       )}
 
-      {/* 🌟 擲骰子輕快動畫 */}
       {gameData.gameState === 'ROLLING' && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
           <div className="flex gap-10 bg-white/80 p-12 rounded-[4rem] backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 animate-in zoom-in spin-in-3">
@@ -1467,19 +1459,16 @@ export default function App() {
         </div>
       )}
 
-      {/* 🌟 靜心房空中翻滾筊杯動畫 (物理模擬雙重動畫) */}
       {gameData.gameState === 'BWA_BWEI_ROLLING' && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-8 bg-white/90 p-12 rounded-[4rem] backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-rose-100 animate-in zoom-in spin-in-3">
             <div className="text-rose-500 font-black text-4xl animate-pulse drop-shadow-sm">🙏 神明請指示...</div>
             <div className="flex gap-12 h-32 items-center justify-center">
-              {/* 左邊筊杯：彈跳 + 旋轉 */}
               <div className="animate-[bounce_0.4s_infinite_alternate]">
                 <div className="animate-[spin_0.3s_linear_infinite]">
                    <BweiBlock isFlat={false} className="scale-[1.5]" />
                 </div>
               </div>
-              {/* 右邊筊杯：反向彈跳 + 反向旋轉 (做水平翻轉形成對稱) */}
               <div className="animate-[bounce_0.5s_infinite_alternate-reverse]">
                 <div className="animate-[spin_0.4s_linear_infinite_reverse]">
                    <BweiBlock isFlat={true} className="scale-[1.5] scale-x-[-1]" />
@@ -1490,7 +1479,6 @@ export default function App() {
         </div>
       )}
 
-      {/* 🌟 地圖區域 */}
       <div ref={mapRef} className="flex-grow relative w-full h-full cursor-grab active:cursor-grabbing overflow-hidden z-10">
         <div 
           className="absolute top-0 left-0 origin-top-left transition-transform duration-700 ease-out pointer-events-none" 
