@@ -747,38 +747,39 @@ export default function App() {
   // ==========================================
   if (appPhase === 'LANDING') {
     return (
-      <div className="min-h-screen w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
+      <div className="min-h-screen w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-4 md:p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
         
         <div className="absolute top-10 left-10 w-32 h-32 bg-white/40 rounded-full blur-xl animate-pulse"></div>
         <div className="absolute bottom-20 right-20 w-48 h-48 bg-pink-300/20 rounded-full blur-2xl animate-pulse delay-700"></div>
 
-        <h1 className="text-[4rem] md:text-[5.5rem] font-black mb-10 text-sky-500 tracking-widest drop-shadow-[0_8px_0_rgba(2,132,199,0.2)] text-center leading-tight">
-          信實大轉盤
-          <span className="block text-2xl text-rose-400 mt-2 tracking-normal">Candy Bubble Edition 🍬</span>
+        {/* 🌟 標題文字改為大信翁，並縮小標題尺寸與底部間距 */}
+        <h1 className="text-5xl md:text-[4.5rem] font-black mb-4 md:mb-6 text-sky-500 tracking-widest drop-shadow-[0_6px_0_rgba(2,132,199,0.2)] text-center leading-tight">
+          大信翁
+          <span className="block text-xl md:text-2xl text-rose-400 mt-1 tracking-normal">Candy Bubble Edition 🍬</span>
         </h1>
         
-        {errorMsg && <div className="mb-6 bg-rose-100 text-rose-700 p-4 rounded-3xl border-4 border-rose-300 shadow-sm">{errorMsg}</div>}
+        {errorMsg && <div className="mb-4 bg-rose-100 text-rose-700 p-3 rounded-2xl border-4 border-rose-300 shadow-sm">{errorMsg}</div>}
         
-        {/* 🌟 修正選人介面過長：改成可變寬的 2-Column 排版設計 */}
-        <div className={`bg-white/90 backdrop-blur-md border-[6px] border-sky-200 p-8 md:p-10 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] w-full transition-all duration-300 relative z-10 ${setupMode === 'INIT' ? 'max-w-md flex flex-col items-center gap-8' : 'max-w-4xl flex flex-col'}`}>
+        {/* 🌟 縮減內距與間距，防止一頁式破版 */}
+        <div className={`bg-white/90 backdrop-blur-md border-[6px] border-sky-200 p-6 md:p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] w-full transition-all duration-300 relative z-10 ${setupMode === 'INIT' ? 'max-w-md flex flex-col items-center gap-5' : 'max-w-4xl flex flex-col'}`}>
           
           {setupMode === 'INIT' && (
-            <div className="flex flex-col gap-5 w-full">
-              <button onClick={() => setSetupMode('LOCAL')} className="py-6 rounded-[2rem] text-3xl bg-amber-400 text-amber-900 border-[6px] border-white shadow-[0_8px_0_0_#d97706,0_15px_20px_rgba(0,0,0,0.1)] hover:-translate-y-1 hover:bg-amber-300 active:border-b-[0px] active:translate-y-[8px] active:shadow-none transition-all relative overflow-hidden group">
+            <div className="flex flex-col gap-4 w-full">
+              <button onClick={() => setSetupMode('LOCAL')} className="py-4 md:py-5 rounded-[2rem] text-2xl md:text-3xl bg-amber-400 text-amber-900 border-[6px] border-white shadow-[0_6px_0_0_#d97706,0_10px_15px_rgba(0,0,0,0.1)] hover:-translate-y-1 hover:bg-amber-300 active:border-b-[0px] active:translate-y-[6px] active:shadow-none transition-all relative overflow-hidden group">
                 單機同樂 🎪
                 <span className="text-sm block font-bold text-amber-800/70 mt-1">大家一起圍著螢幕玩</span>
               </button>
               
-              <div className="flex items-center gap-4 my-2 opacity-40">
+              <div className="flex items-center gap-4 my-1 opacity-40">
                 <div className="flex-1 h-1.5 bg-sky-200 rounded-full"></div>
                 <span className="font-black text-sky-800 text-sm tracking-widest">線上模式</span>
                 <div className="flex-1 h-1.5 bg-sky-200 rounded-full"></div>
               </div>
 
-              <button disabled={!user} onClick={() => setSetupMode('CREATE')} className={`py-5 rounded-[2rem] text-2xl border-[5px] border-white shadow-[0_6px_0_0_#0ea5e9,0_10px_15px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[6px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_6px_0_0_#cbd5e1]' : 'bg-sky-400 text-sky-900 hover:bg-sky-300'}`}>
+              <button disabled={!user} onClick={() => setSetupMode('CREATE')} className={`py-4 rounded-[2rem] text-xl md:text-2xl border-[5px] border-white shadow-[0_5px_0_0_#0ea5e9,0_8px_10px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[5px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_5px_0_0_#cbd5e1]' : 'bg-sky-400 text-sky-900 hover:bg-sky-300'}`}>
                 {user ? "創建連線房間 🏠" : "雲端連線中..."}
               </button>
-              <button disabled={!user} onClick={() => setSetupMode('JOIN')} className={`py-5 rounded-[2rem] text-2xl border-[5px] border-white shadow-[0_6px_0_0_#10b981,0_10px_15px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[6px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_6px_0_0_#cbd5e1]' : 'bg-emerald-400 text-emerald-900 hover:bg-emerald-300'}`}>
+              <button disabled={!user} onClick={() => setSetupMode('JOIN')} className={`py-4 rounded-[2rem] text-xl md:text-2xl border-[5px] border-white shadow-[0_5px_0_0_#10b981,0_8px_10px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[5px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_5px_0_0_#cbd5e1]' : 'bg-emerald-400 text-emerald-900 hover:bg-emerald-300'}`}>
                 加入好友房間 🚀
               </button>
             </div>
@@ -786,18 +787,18 @@ export default function App() {
 
           {/* 🌟 寬螢幕排版設計 (LOCAL & CREATE) */}
           {(setupMode === 'LOCAL' || setupMode === 'CREATE') && (
-            <div className="w-full flex flex-col items-center gap-6 animate-in zoom-in-95 duration-300">
+            <div className="w-full flex flex-col items-center gap-4 animate-in zoom-in-95 duration-300">
               
               {/* 雙欄內容區 */}
-              <div className="flex flex-col md:flex-row w-full gap-8">
+              <div className="flex flex-col md:flex-row w-full gap-6">
                 
                 {/* 左側：遊戲基礎設定 */}
-                <div className="flex-1 flex flex-col justify-center gap-6">
+                <div className="flex-1 flex flex-col justify-center gap-4">
                   <div className="w-full">
-                    <div className="text-center text-sky-700 mb-4 flex items-center justify-center gap-2 text-xl"><UsersIcon size={24}/> 幾個人一起玩呢？</div>
-                    <div className="flex flex-wrap justify-center gap-3">
+                    <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><UsersIcon size={20}/> 幾個人一起玩呢？</div>
+                    <div className="flex flex-wrap justify-center gap-2 md:gap-3">
                       {[2, 3, 4, 5, 6].map(num => (
-                        <button key={num} onClick={() => setSetupPlayerCount(num)} className={`w-14 h-14 rounded-full text-2xl transition-all border-4 border-white ${setupPlayerCount === num ? 'bg-amber-400 text-amber-900 scale-110 shadow-[0_5px_0_0_#d97706]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>
+                        <button key={num} onClick={() => setSetupPlayerCount(num)} className={`w-12 h-12 md:w-14 md:h-14 rounded-full text-xl md:text-2xl transition-all border-4 border-white ${setupPlayerCount === num ? 'bg-amber-400 text-amber-900 scale-110 shadow-[0_4px_0_0_#d97706]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>
                           {num}
                         </button>
                       ))}
@@ -807,10 +808,10 @@ export default function App() {
                   <div className="w-full border-t-[3px] border-dashed border-sky-100"></div>
 
                   <div className="w-full">
-                    <div className="text-center text-sky-700 mb-4 flex items-center justify-center gap-2 text-xl"><Clock size={24}/> 玩多久呢？</div>
-                    <div className="flex flex-wrap justify-center gap-3">
+                    <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><Clock size={20}/> 玩多久呢？</div>
+                    <div className="flex flex-wrap justify-center gap-2 md:gap-3">
                       {[{l: '5 分', v: 300}, {l: '10 分', v: 600}, {l: '20 分', v: 1200}, {l: '不限時', v: -1}].map(t => (
-                        <button key={t.v} onClick={() => setSetupTimeLimit(t.v)} className={`px-5 py-3 rounded-[1.5rem] transition-all border-4 border-white ${setupTimeLimit === t.v ? 'bg-pink-400 text-pink-900 shadow-[0_5px_0_0_#db2777]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>
+                        <button key={t.v} onClick={() => setSetupTimeLimit(t.v)} className={`px-4 py-2 md:px-5 md:py-3 rounded-[1.5rem] transition-all border-4 border-white text-sm md:text-base ${setupTimeLimit === t.v ? 'bg-pink-400 text-pink-900 shadow-[0_4px_0_0_#db2777]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>
                           {t.l}
                         </button>
                       ))}
@@ -821,23 +822,23 @@ export default function App() {
                 {/* 右側：專屬角色設定 */}
                 <div className="flex-[1.2] flex flex-col">
                   {setupMode === 'LOCAL' ? (
-                    <div className="w-full bg-sky-50 rounded-[2rem] p-5 border-4 border-white shadow-sm h-full flex flex-col">
-                      <div className="text-center text-sky-800 mb-4 text-lg">選一個喜歡的角色吧！👇</div>
-                      <div className="flex flex-wrap justify-center gap-3 mb-4">
+                    <div className="w-full bg-sky-50 rounded-[2rem] p-4 md:p-5 border-4 border-white shadow-sm h-full flex flex-col">
+                      <div className="text-center text-sky-800 mb-2 md:mb-3 text-base md:text-lg">選一個喜歡的角色吧！👇</div>
+                      <div className="flex flex-wrap justify-center gap-2 md:gap-3 mb-2 md:mb-4">
                         {Array.from({ length: setupPlayerCount }).map((_, i) => (
-                          <div key={i} className="flex flex-col items-center gap-2">
+                          <div key={i} className="flex flex-col items-center gap-1 md:gap-2">
                             <button 
                               onClick={() => setEditingLocalPlayer(i)}
-                              className={`w-12 h-12 rounded-full text-3xl flex items-center justify-center bg-white transition-all border-4 ${editingLocalPlayer === i ? 'border-amber-400 scale-125 shadow-lg z-10 relative' : 'border-sky-200 opacity-70 hover:opacity-100 hover:scale-110'}`}
+                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full text-2xl md:text-3xl flex items-center justify-center bg-white transition-all border-4 ${editingLocalPlayer === i ? 'border-amber-400 scale-125 shadow-lg z-10 relative' : 'border-sky-200 opacity-70 hover:opacity-100 hover:scale-110'}`}
                             >
                               {localAvatars[i]}
                             </button>
-                            <span className="text-xs text-sky-600 bg-white px-2 py-0.5 rounded-full border-2 border-sky-100">P{i+1}</span>
+                            <span className="text-[10px] md:text-xs text-sky-600 bg-white px-2 py-0.5 rounded-full border-2 border-sky-100">P{i+1}</span>
                           </div>
                         ))}
                       </div>
 
-                      <div className="flex flex-wrap justify-center gap-2 max-h-36 overflow-y-auto p-3 bg-white rounded-[1.5rem] border-2 border-sky-100 custom-scrollbar mt-auto">
+                      <div className="flex flex-wrap justify-center gap-2 max-h-24 md:max-h-32 overflow-y-auto p-2 bg-white rounded-[1.5rem] border-2 border-sky-100 custom-scrollbar mt-auto">
                         {CHILD_AVATARS.map(avatar => {
                           const targetIdx = editingLocalPlayer < setupPlayerCount ? editingLocalPlayer : 0;
                           return (
@@ -848,7 +849,7 @@ export default function App() {
                                 newAvatars[targetIdx] = avatar;
                                 setLocalAvatars(newAvatars);
                               }} 
-                              className={`w-12 h-12 rounded-full text-3xl flex items-center justify-center transition-all ${localAvatars[targetIdx] === avatar ? 'bg-amber-100 border-4 border-amber-400 scale-110' : 'bg-slate-50 border-2 border-transparent hover:bg-sky-100'}`}
+                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full text-2xl md:text-3xl flex items-center justify-center transition-all ${localAvatars[targetIdx] === avatar ? 'bg-amber-100 border-4 border-amber-400 scale-110' : 'bg-slate-50 border-2 border-transparent hover:bg-sky-100'}`}
                             >
                               {avatar}
                             </button>
@@ -857,11 +858,11 @@ export default function App() {
                       </div>
                     </div>
                   ) : (
-                    <div className="w-full bg-sky-50 rounded-[2rem] p-6 border-4 border-white shadow-sm h-full flex flex-col justify-center">
-                      <div className="text-center text-sky-800 mb-4 text-xl">選一個喜歡的角色吧！</div>
-                      <div className="flex flex-wrap justify-center gap-3 max-h-48 overflow-y-auto p-2 custom-scrollbar">
+                    <div className="w-full bg-sky-50 rounded-[2rem] p-5 md:p-6 border-4 border-white shadow-sm h-full flex flex-col justify-center">
+                      <div className="text-center text-sky-800 mb-3 md:mb-4 text-lg md:text-xl">選一個喜歡的角色吧！</div>
+                      <div className="flex flex-wrap justify-center gap-2 md:gap-3 max-h-36 md:max-h-48 overflow-y-auto p-2 custom-scrollbar">
                         {CHILD_AVATARS.map(avatar => (
-                          <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-16 h-16 rounded-full text-4xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}>
+                          <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-12 h-12 md:w-16 md:h-16 rounded-full text-3xl md:text-4xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}>
                             {avatar}
                           </button>
                         ))}
@@ -872,35 +873,35 @@ export default function App() {
               </div>
 
               {/* 底部按鈕 */}
-              <div className="flex w-full gap-4 mt-4 max-w-lg mx-auto">
-                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-xl shadow-sm">返回</button>
-                <button onClick={setupMode === 'LOCAL' ? handleStartLocalGame : handleCreateRoom} className="flex-[2] py-4 text-white bg-emerald-400 rounded-[2rem] shadow-[0_6px_0_0_#10b981] hover:-translate-y-1 active:translate-y-[6px] active:shadow-none active:border-b-0 transition-all text-2xl border-[4px] border-white">出發囉！✨</button>
+              <div className="flex w-full gap-3 md:gap-4 mt-2 max-w-lg mx-auto">
+                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
+                <button onClick={setupMode === 'LOCAL' ? handleStartLocalGame : handleCreateRoom} className="flex-[2] py-3 md:py-4 text-white bg-emerald-400 rounded-[2rem] shadow-[0_5px_0_0_#10b981] hover:-translate-y-1 active:translate-y-[5px] active:shadow-none active:border-b-0 transition-all text-xl md:text-2xl border-[4px] border-white">出發囉！✨</button>
               </div>
             </div>
           )}
 
           {/* 🌟 寬螢幕排版設計 (JOIN) */}
           {setupMode === 'JOIN' && (
-            <div className="w-full flex flex-col items-center gap-6 animate-in zoom-in-95 duration-300">
+            <div className="w-full flex flex-col items-center gap-5 animate-in zoom-in-95 duration-300">
               
-              <div className="flex flex-col md:flex-row w-full gap-8">
-                <div className="flex-1 flex flex-col justify-center gap-6">
+              <div className="flex flex-col md:flex-row w-full gap-6">
+                <div className="flex-1 flex flex-col justify-center gap-5">
                   <div className="w-full">
-                    <div className="text-center text-sky-700 mb-4 text-xl">請輸入房間密碼 🔑</div>
+                    <div className="text-center text-sky-700 mb-3 text-lg md:text-xl">請輸入房間密碼 🔑</div>
                     <input 
                       type="text" placeholder="A1B2C3" 
                       value={roomId} onChange={e => setRoomId(e.target.value.toUpperCase())} 
-                      className="w-full bg-white p-5 rounded-[2rem] text-center text-4xl font-black border-[4px] border-sky-200 focus:border-amber-400 outline-none uppercase tracking-widest text-[#4a3424] shadow-inner" 
+                      className="w-full bg-white p-4 md:p-5 rounded-[2rem] text-center text-3xl md:text-4xl font-black border-[4px] border-sky-200 focus:border-amber-400 outline-none uppercase tracking-widest text-[#4a3424] shadow-inner" 
                     />
                   </div>
                 </div>
 
                 <div className="flex-[1.2] flex flex-col">
-                  <div className="w-full bg-sky-50 rounded-[2rem] p-6 border-4 border-white shadow-sm h-full flex flex-col justify-center">
-                    <div className="text-center text-sky-800 mb-4 text-xl">選一個喜歡的角色吧！</div>
-                    <div className="flex flex-wrap justify-center gap-3 max-h-48 overflow-y-auto p-2 custom-scrollbar">
+                  <div className="w-full bg-sky-50 rounded-[2rem] p-5 border-4 border-white shadow-sm h-full flex flex-col justify-center">
+                    <div className="text-center text-sky-800 mb-3 md:mb-4 text-lg md:text-xl">選一個喜歡的角色吧！</div>
+                    <div className="flex flex-wrap justify-center gap-2 md:gap-3 max-h-36 overflow-y-auto p-2 custom-scrollbar">
                       {CHILD_AVATARS.map(avatar => (
-                        <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-16 h-16 rounded-full text-4xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}>
+                        <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-12 h-12 md:w-16 md:h-16 rounded-full text-3xl md:text-4xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}>
                           {avatar}
                         </button>
                       ))}
@@ -909,9 +910,9 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex w-full gap-4 mt-4 max-w-lg mx-auto">
-                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-xl shadow-sm">返回</button>
-                <button disabled={roomId.length < 4} onClick={handleJoinRoom} className={`flex-[2] py-4 text-white rounded-[2rem] transition-all text-2xl border-[4px] border-white ${roomId.length < 4 ? 'bg-slate-300 border-slate-200' : 'bg-sky-400 shadow-[0_6px_0_0_#0ea5e9] hover:-translate-y-1 active:translate-y-[6px] active:shadow-none active:border-b-0'}`}>加入房間 🚀</button>
+              <div className="flex w-full gap-3 md:gap-4 mt-2 max-w-lg mx-auto">
+                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
+                <button disabled={roomId.length < 4} onClick={handleJoinRoom} className={`flex-[2] py-3 md:py-4 text-white rounded-[2rem] transition-all text-xl md:text-2xl border-[4px] border-white ${roomId.length < 4 ? 'bg-slate-300 border-slate-200' : 'bg-sky-400 shadow-[0_5px_0_0_#0ea5e9] hover:-translate-y-1 active:translate-y-[5px] active:shadow-none active:border-b-0'}`}>加入房間 🚀</button>
               </div>
             </div>
           )}
@@ -1352,10 +1353,10 @@ export default function App() {
                       return (
                         <div key={p.id} className={`absolute transition-all duration-500 ease-out pointer-events-auto flex flex-col items-center ${isActive ? 'z-50' : 'z-10'}`} style={{ transform: `translate(${tX}px, ${tY}px)` }}>
                           
-                          {/* 🌟 巨型泡泡計步器 - 已使用隔離保護層完美置中 */}
+                          {/* 🌟 巨型泡泡計步器 - 已使用保護外框(w-24 flex justify-center)完美置中 */}
                           {gameData.gameState === 'MOVING' && gameData.currentPlayerIdx === p.id && gameData.remainingSteps > 0 && (
-                            <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 z-[150]">
-                              <div className="bg-sky-400 border-[6px] border-white text-white font-black rounded-full w-[110px] h-[110px] flex items-center justify-center text-[3.5rem] shadow-[0_10px_20px_rgba(0,0,0,0.15)] animate-bounce">
+                            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-[150] w-24 flex justify-center">
+                              <div className="bg-sky-400 border-[6px] border-white text-white font-black rounded-full w-24 h-24 flex items-center justify-center text-[3rem] shadow-[0_10px_20px_rgba(0,0,0,0.15)] animate-bounce">
                                 {gameData.remainingSteps}
                               </div>
                             </div>
