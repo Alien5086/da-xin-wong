@@ -120,11 +120,10 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
 
-// 🌟 新增：Web Audio API 音效合成器 (無須外部音檔，跨平台支援！)
+// 🌟 新增：Web Audio API 音效合成器
 const audioCtx = typeof window !== 'undefined' ? new (window.AudioContext || window.webkitAudioContext)() : null;
 const playSound = (type, isMuted) => {
   if (isMuted || !audioCtx) return;
-  // 瀏覽器安全機制：確保在使用者互動後啟動音效
   if (audioCtx.state === 'suspended') audioCtx.resume();
   
   const now = audioCtx.currentTime;
@@ -189,6 +188,27 @@ const DiceIcon = ({ value, ...props }) => {
   return <Icon {...props} />;
 };
 
+// 🌟 全新升級：擬真 3D 半月筊杯組件
+const BweiBlock = ({ isFlat, className = "" }) => {
+  return (
+    <div className={`relative ${className}`}>
+      {isFlat ? (
+        // 陽面 (平的，朝上)：淺紅粉色，內部平整，沒有高光
+        <div className="w-[32px] h-[75px] bg-[#fb7185] border-[2px] border-[#e11d48] rounded-r-[40px] rounded-l-[6px] shadow-inner drop-shadow-md relative overflow-hidden">
+           <div className="absolute top-1 bottom-1 left-1 right-2 bg-[#fda4af] rounded-r-[30px] rounded-l-[4px] opacity-90"></div>
+        </div>
+      ) : (
+        // 陰面 (凸的，朝上)：深暗紅色，右側圓弧邊帶有暗角陰影與立體反光高光
+        <div className="w-[32px] h-[75px] bg-[#be123c] border-[2px] border-[#881337] rounded-r-[40px] rounded-l-[6px] shadow-[inset_-6px_0_10px_rgba(0,0,0,0.5)] drop-shadow-xl relative overflow-hidden">
+           {/* 🌟 弧面立體高光 (反光條)，製造圓潤凸起的錯覺 */}
+           <div className="absolute top-2 bottom-2 right-1.5 w-[6px] bg-white/40 rounded-full blur-[2px]"></div>
+           <div className="absolute top-4 bottom-4 right-2.5 w-[2px] bg-white/60 rounded-full blur-[0.5px]"></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- 主程式組件 ---
 export default function App() {
   const [appPhase, setAppPhase] = useState('LANDING'); 
@@ -211,7 +231,6 @@ export default function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   
-  // 🌟 新增：背景音樂相關狀態與參考
   const bgmRef = useRef(null);
   const [bgmStarted, setBgmStarted] = useState(false);
 
@@ -249,11 +268,10 @@ export default function App() {
     }
   };
 
-  // 🌟 新增：初始化背景音樂引擎
   useEffect(() => {
     bgmRef.current = new Audio("https://dn721809.ca.archive.org/0/items/md_music_toy_story/13%20-%20Level%209%20-%20Food%20and%20Drink%20-%20Andy%20Blythe%2C%20Marten%20Joustra.mp3");
-    bgmRef.current.loop = true;  // 設定重複播放
-    bgmRef.current.volume = 0.1; // 🌟 將音量調小至 10%，作為柔和的背景點綴
+    bgmRef.current.loop = true;  
+    bgmRef.current.volume = 0.1; 
     return () => {
       if (bgmRef.current) {
         bgmRef.current.pause();
@@ -262,7 +280,6 @@ export default function App() {
     };
   }, []);
 
-  // 🌟 新增：監聽靜音按鈕與播放狀態
   useEffect(() => {
     if (!bgmRef.current) return;
     if (isMuted) {
@@ -272,7 +289,6 @@ export default function App() {
     }
   }, [isMuted, bgmStarted]);
 
-  // 🌟 新增：全域監聽第一次互動，優雅解除瀏覽器自動播放限制
   useEffect(() => {
     const handleInteraction = () => {
       if (!bgmStarted) setBgmStarted(true);
@@ -418,7 +434,7 @@ export default function App() {
   }, [gameData.currentPlayerIdx, gameData.players[gameData.currentPlayerIdx]?.pos, isFullMapMode, displayZoom, viewportSize, appPhase, focusOnCurrentPlayer]);
 
   const handleStartLocalGame = async () => {
-    playSound('win', isMuted); // 🌟 播放開始遊戲音效
+    playSound('win', isMuted); 
     setIsOfflineMode(true);
     const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
       id: i, 
@@ -440,7 +456,7 @@ export default function App() {
 
   const handleCreateRoom = async () => {
     if (!user) return;
-    playSound('win', isMuted); // 🌟 播放開始遊戲音效
+    playSound('win', isMuted); 
     setIsOfflineMode(false);
     const id = Math.random().toString(36).substring(2, 8).toUpperCase();
     const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
@@ -462,7 +478,7 @@ export default function App() {
 
   const handleJoinRoom = async () => {
     if (!user || roomId.length < 4) return;
-    playSound('win', isMuted); // 🌟 播放加入遊戲音效
+    playSound('win', isMuted); 
     setIsOfflineMode(false);
     try {
       const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
@@ -507,7 +523,7 @@ export default function App() {
   const handleRollDice = async () => {
     if (gameData.currentPlayerIdx !== activePlayerIndex) return;
 
-    playSound('roll', isMuted); // 🌟 播放擲骰子音效
+    playSound('roll', isMuted); 
 
     const d1 = Math.floor(Math.random() * 6) + 1;
     const d2 = Math.floor(Math.random() * 6) + 1;
@@ -552,7 +568,7 @@ export default function App() {
         const player = gameData.players[activePlayerIndex];
         
         if (gameData.remainingSteps > 0) {
-          playSound('move', isMuted); // 🌟 播放移動腳步聲
+          playSound('move', isMuted); 
           const targetPos = player.pos + 1;
           let newPos = targetPos % 40;
           let newMoney = player.money;
@@ -590,11 +606,11 @@ export default function App() {
     const newPlayers = [...gameData.players];
 
     if (sq.type === 'START') {
-      playSound('coin', isMuted); // 🌟 音效
+      playSound('coin', isMuted); 
       msg += `停在起點休息，沒有零用錢喔 😜`;
       nextState = 'END_TURN';
     } else if (sq.type === 'TAX') {
-      playSound('bad', isMuted); // 🌟 音效
+      playSound('bad', isMuted); 
       newPlayers[activePlayerIndex].money -= sq.amount;
       msg += `💸 繳納 ${sq.name} $${sq.amount}！`;
       nextState = 'END_TURN';
@@ -604,59 +620,65 @@ export default function App() {
       
       msg += `【 ${card.desc} 】\n\n`;
       if (card.goToJail) {
-         playSound('bad', isMuted); // 🌟 音效
+         playSound('bad', isMuted); 
          newPlayers[activePlayerIndex].pos = 10;
          newPlayers[activePlayerIndex].inJail = true;
          newPlayers[activePlayerIndex].jailRoundsLeft = -1; 
-         msg += `直接送進反省泡泡！\n請誠心擲杯問神明。`;
+         // 🌟 更新：抽卡進入靜心室的文字
+         msg += `好好的懺悔反省 🙏\n請誠心擲杯問神明。`;
          nextState = 'JAIL_BWA_BWEI'; 
       } else {
-         if (card.effectM > 0 || card.effectT > 0) playSound('win', isMuted); // 🌟 音效
-         else playSound('bad', isMuted); // 🌟 音效
+         if (card.effectM > 0 || card.effectT > 0) playSound('win', isMuted); 
+         else playSound('bad', isMuted); 
          newPlayers[activePlayerIndex].money += card.effectM;
          newPlayers[activePlayerIndex].trust += card.effectT;
          msg += `資金 ${card.effectM > 0 ? '+'+card.effectM : card.effectM}\n信用 ${card.effectT > 0 ? '+'+card.effectT : card.effectT}`;
       }
       if (!card.goToJail) nextState = 'END_TURN';
     } else if (sq.type === 'GO_TO_JAIL' || sq.id === 30 || sq.type === 'JAIL' || sq.id === 10) {
-      playSound('bad', isMuted); // 🌟 音效
+      playSound('bad', isMuted); 
       newPlayers[activePlayerIndex].pos = 10;
       newPlayers[activePlayerIndex].inJail = true;
       newPlayers[activePlayerIndex].jailRoundsLeft = -1; 
-      msg += `進入反省泡泡！\n請誠心擲杯問神明。`;
+      // 🌟 更新：走到靜心室的文字
+      msg += `好好的懺悔反省 🙏\n請誠心擲杯問神明。`;
       nextState = 'JAIL_BWA_BWEI'; 
     } else if (sq.type === 'PROPERTY') {
       const ownerId = gameData.properties?.[sq.id];
       if (ownerId !== undefined && ownerId !== activePlayerIndex) {
         const owner = newPlayers[ownerId];
         if (!owner.inJail && !owner.isBankrupt) { 
-           playSound('bad', isMuted); // 🌟 音效
+           playSound('bad', isMuted); 
            const rent = Math.floor(sq.price * 0.4);
            newPlayers[activePlayerIndex].money -= rent;
            newPlayers[ownerId].money += rent;
            msg += `踩到 ${owner.name} 的地盤，\n付過路費 $${rent} 給他吧！`;
         } else {
-           playSound('win', isMuted); // 🌟 音效
+           playSound('win', isMuted); 
            msg += `幸運！ ${owner.name} ${owner.inJail ? '正在反省' : '已出局'}，免付過路費！ 🎉`;
         }
         nextState = 'END_TURN';
       } else if (ownerId === undefined) {
-        playSound('click', isMuted); // 🌟 音效
+        playSound('click', isMuted); 
         msg += `來到空地：${sq.name} 🏕️`;
       } else {
-        playSound('click', isMuted); // 🌟 音效
+        playSound('click', isMuted); 
         msg += `來到自己的 ${sq.name}，\n巡視一下產業！ 😎`;
         nextState = 'END_TURN';
       }
+    } else if (sq.type === 'FREE_PARKING') {
+      playSound('click', isMuted); 
+      msg += `平靜的一回合，\n培養品德心性的好地方 🍵`;
+      nextState = 'END_TURN';
     } else {
-      playSound('click', isMuted); // 🌟 音效
+      playSound('click', isMuted); 
       msg += `在 ${sq.name} 休息一天 💤`;
       nextState = 'END_TURN';
     }
 
     const bankruptCheck = checkBankruptcy(newPlayers);
     if (bankruptCheck.changed && bankruptCheck.newPlayers[activePlayerIndex].isBankrupt) {
-       playSound('bad', isMuted); // 🌟 音效
+       playSound('bad', isMuted); 
        msg += `\n\n🚨 哎呀！資金或信用歸零，你出局了！`;
        nextState = 'END_TURN';
     }
@@ -672,7 +694,7 @@ export default function App() {
 
   const handleThrowBwaBwei = async () => {
     if (gameData.currentPlayerIdx !== activePlayerIndex) return;
-    playSound('bwa', isMuted); // 🌟 播放擲杯音效
+    playSound('bwa', isMuted); 
     await syncGameData({ gameState: 'BWA_BWEI_ROLLING' });
   };
 
@@ -692,7 +714,7 @@ export default function App() {
           gameState: 'JAIL_BWA_BWEI',
           bwaBweiResults: newResults
         });
-      }, 800); 
+      }, 1000); // 動畫時間稍微延長，讓空中翻滾更好看
       return () => clearTimeout(timer);
     }
   }, [gameData.gameState, gameData.currentPlayerIdx, activePlayerIndex, gameData.bwaBweiResults, isOfflineMode, roomId]);
@@ -701,18 +723,19 @@ export default function App() {
     const newPlayers = [...gameData.players];
     const holyCount = (gameData.bwaBweiResults || []).filter(r => r === 'HOLY').length;
     
-    let msg = `🎲 總共擲出【 ${holyCount} 次聖杯 】\n\n`;
+    // 🌟 移除骰子圖案，並精簡換行，讓結果在一行內俐落呈現
+    let msg = `總共擲出【 ${holyCount} 次聖杯 】\n`;
     if (holyCount === 3) {
-      playSound('win', isMuted); // 🌟 音效
+      playSound('win', isMuted); 
       newPlayers[activePlayerIndex].jailRoundsLeft = 0;
       newPlayers[activePlayerIndex].money -= 500;
       newPlayers[activePlayerIndex].inJail = false;
-      msg += `✨ 神明原諒你了！\n(繳交罰款 $500)\n\n你重獲自由，下回合可正常玩囉！`;
+      msg += `✨ 神明原諒你了！(繳交罰款 $500)\n你重獲自由，下回合可正常玩囉！`;
     } else {
-      playSound('bad', isMuted); // 🌟 音效
+      playSound('bad', isMuted); 
       const waitRounds = 3 - holyCount; 
       newPlayers[activePlayerIndex].jailRoundsLeft = waitRounds;
-      msg += `神明要你繼續反省...\n\n需在泡泡裡等待 ${waitRounds} 輪。`;
+      msg += `神明要你繼續反省...\n需在泡泡裡等待 ${waitRounds} 輪。`;
     }
     
     await syncGameData({
@@ -734,7 +757,7 @@ export default function App() {
       const reqTrust = Number(sq.reqTrust || 0);
 
       if (pMoney >= reqMoney && pTrust >= reqTrust) {
-        playSound('coin', isMuted); // 🌟 播放購買成功音效
+        playSound('coin', isMuted); 
         const newPlayers = [...gameData.players];
         newPlayers[activePlayerIndex].money -= reqMoney;
 
@@ -759,7 +782,7 @@ export default function App() {
         const sq = BOARD_SQUARES[sqId];
         if (!sq) return;
         
-        playSound('coin', isMuted); // 🌟 播放賣出音效
+        playSound('coin', isMuted); 
 
         const isHighTrust = player.trust > 10;
         const sellPrice = isHighTrust ? sq.price : Math.floor(sq.price / 2);
@@ -782,7 +805,7 @@ export default function App() {
          const player = gameData.players[activePlayerIndex];
          if (player.trust <= 1) return; 
          
-         playSound('coin', isMuted); // 🌟 播放換錢音效
+         playSound('coin', isMuted); 
 
          const isHighTrust = player.trust >= 10;
          const exchangeRate = isHighTrust ? 1000 : 500;
@@ -799,7 +822,7 @@ export default function App() {
 
   const handleEndTurn = async () => {
     try {
-      playSound('click', isMuted); // 🌟 播放結束回合點擊音效
+      playSound('click', isMuted); 
       let newPlayers = [...gameData.players];
       let nextIdx = gameData.currentPlayerIdx;
       
@@ -853,7 +876,6 @@ export default function App() {
         <div className="absolute top-10 left-10 w-32 h-32 bg-white/40 rounded-full blur-xl animate-pulse"></div>
         <div className="absolute bottom-20 right-20 w-48 h-48 bg-pink-300/20 rounded-full blur-2xl animate-pulse delay-700"></div>
 
-        {/* 🌟 標題文字改為大信翁，並縮小標題尺寸與底部間距 */}
         <h1 className="text-5xl md:text-[4.5rem] font-black mb-4 md:mb-6 text-sky-500 tracking-widest drop-shadow-[0_6px_0_rgba(2,132,199,0.2)] text-center leading-tight">
           大信翁
           <span className="block text-xl md:text-2xl text-rose-400 mt-1 tracking-normal">Candy Bubble Edition 🍬</span>
@@ -861,7 +883,6 @@ export default function App() {
         
         {errorMsg && <div className="mb-4 bg-rose-100 text-rose-700 p-3 rounded-2xl border-4 border-rose-300 shadow-sm">{errorMsg}</div>}
         
-        {/* 🌟 縮減內距與間距，防止一頁式破版 */}
         <div className={`bg-white/90 backdrop-blur-md border-[6px] border-sky-200 p-6 md:p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] w-full transition-all duration-300 relative z-10 ${setupMode === 'INIT' ? 'max-w-md flex flex-col items-center gap-5' : 'max-w-4xl flex flex-col'}`}>
           
           {setupMode === 'INIT' && (
@@ -886,14 +907,9 @@ export default function App() {
             </div>
           )}
 
-          {/* 🌟 寬螢幕排版設計 (LOCAL & CREATE) */}
           {(setupMode === 'LOCAL' || setupMode === 'CREATE') && (
             <div className="w-full flex flex-col items-center gap-4 animate-in zoom-in-95 duration-300">
-              
-              {/* 雙欄內容區 */}
               <div className="flex flex-col md:flex-row w-full gap-6">
-                
-                {/* 左側：遊戲基礎設定 */}
                 <div className="flex-1 flex flex-col justify-center gap-4">
                   <div className="w-full">
                     <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><UsersIcon size={20}/> 幾個人一起玩呢？</div>
@@ -920,7 +936,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 右側：專屬角色設定 */}
                 <div className="flex-[1.2] flex flex-col">
                   {setupMode === 'LOCAL' ? (
                     <div className="w-full bg-sky-50 rounded-[2rem] p-4 md:p-5 border-4 border-white shadow-sm h-full flex flex-col">
@@ -973,7 +988,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 底部按鈕 */}
               <div className="flex w-full gap-3 md:gap-4 mt-2 max-w-lg mx-auto">
                 <button onClick={() => setSetupMode('INIT')} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
                 <button onClick={setupMode === 'LOCAL' ? handleStartLocalGame : handleCreateRoom} className="flex-[2] py-3 md:py-4 text-white bg-emerald-400 rounded-[2rem] shadow-[0_5px_0_0_#10b981] hover:-translate-y-1 active:translate-y-[5px] active:shadow-none active:border-b-0 transition-all text-xl md:text-2xl border-[4px] border-white">出發囉！✨</button>
@@ -981,10 +995,8 @@ export default function App() {
             </div>
           )}
 
-          {/* 🌟 寬螢幕排版設計 (JOIN) */}
           {setupMode === 'JOIN' && (
             <div className="w-full flex flex-col items-center gap-5 animate-in zoom-in-95 duration-300">
-              
               <div className="flex flex-col md:flex-row w-full gap-6">
                 <div className="flex-1 flex flex-col justify-center gap-5">
                   <div className="w-full">
@@ -1228,7 +1240,6 @@ export default function App() {
                   {isOfflineMode && <div className="text-amber-500 text-base mt-1">({myPlayer?.name} 的包包)</div>}
               </div>
               
-              {/* 🌟 全新雙欄資產顯示區：左邊資金、右邊信用 */}
               <div className="flex gap-3 mb-5">
                  <div className="flex-1 bg-emerald-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm flex flex-col items-center relative overflow-hidden">
                     <div className="absolute -right-2 -bottom-4 text-[4rem] opacity-10">💰</div>
@@ -1280,10 +1291,11 @@ export default function App() {
         </div>
       )}
 
-      {/* 🌟 獨立的動作與訊息通知面板 (固定於畫面底部，保證絕不被遮擋) */}
+      {/* 🌟 獨立的動作與訊息通知面板 (固定於畫面底部) */}
       {gameData.currentPlayerIdx === activePlayerIndex && !myPlayer?.isBankrupt && ['JAIL_BWA_BWEI', 'ACTION', 'END_TURN'].includes(gameData.gameState) && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[250] bg-white/95 backdrop-blur-md p-10 rounded-[3rem] shadow-[0_25px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 min-w-[380px] max-w-[95vw] text-center animate-in slide-in-from-bottom-8 duration-300 pointer-events-auto flex flex-col items-center gap-6">
           
+          {/* 🌟 靜心房：擬真擲杯結果顯示區 */}
           {gameData.gameState === 'JAIL_BWA_BWEI' && (
             <div className="flex flex-col items-center w-full px-2">
               <div className="text-3xl font-black text-rose-500 drop-shadow-sm mb-6 bg-rose-50 px-6 py-2 rounded-full border-4 border-white shadow-sm">🚨 反省泡泡時間</div>
@@ -1291,18 +1303,41 @@ export default function App() {
               <div className="flex gap-5 justify-center mb-6">
                 {[0, 1, 2].map(i => {
                   const res = gameData.bwaBweiResults?.[i];
-                  if (!res) return <div key={i} className="w-[85px] h-[100px] border-[6px] border-dashed border-slate-200 rounded-[2rem] flex items-center justify-center text-slate-200 font-black text-4xl">?</div>;
+                  if (!res) return (
+                    <div key={i} className="w-[90px] h-[110px] border-[6px] border-dashed border-slate-200 rounded-[2rem] flex items-center justify-center text-slate-200 font-black text-4xl">?</div>
+                  );
                   
                   const config = {
-                    'HOLY': { label: '聖杯', desc: '一正一反', color: 'bg-rose-400 text-white border-white shadow-[0_6px_0_0_#e11d48]' },
-                    'LAUGH': { label: '笑杯', desc: '兩正', color: 'bg-amber-400 text-white border-white shadow-[0_6px_0_0_#d97706]' },
-                    'YIN': { label: '無杯', desc: '兩反', color: 'bg-slate-500 text-white border-white shadow-[0_6px_0_0_#334155]' }
+                    'HOLY': { label: '聖杯', desc: '一正一反', color: 'bg-rose-50 border-rose-200 shadow-[0_4px_0_0_#fecdd3]', text: 'text-rose-600' },
+                    'LAUGH': { label: '笑杯', desc: '兩正', color: 'bg-amber-50 border-amber-200 shadow-[0_4px_0_0_#fde68a]', text: 'text-amber-600' },
+                    'YIN': { label: '無杯', desc: '兩反', color: 'bg-slate-50 border-slate-200 shadow-[0_4px_0_0_#e2e8f0]', text: 'text-slate-600' }
                   };
                   const c = config[res];
+
                   return (
-                    <div key={i} className={`w-[85px] h-[100px] rounded-[2rem] flex flex-col items-center justify-center border-4 animate-in zoom-in spin-in-12 ${c.color} transition-all`}>
-                      <span className="font-black text-2xl mb-1">{c.label}</span>
-                      <span className="text-xs font-bold opacity-90 tracking-widest">{c.desc}</span>
+                    <div key={i} className={`w-[90px] h-[110px] rounded-[2rem] flex flex-col items-center justify-center border-4 animate-in zoom-in spin-in-12 ${c.color} transition-all`}>
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                         {/* 🌟 讓兩片半月筊杯對稱排列，完美還原真實落地模樣 */}
+                         {res === 'HOLY' && (
+                           <>
+                             <BweiBlock isFlat={true} className="rotate-[15deg] scale-75" />
+                             <BweiBlock isFlat={false} className="-rotate-[15deg] scale-x-[-1] scale-75" />
+                           </>
+                         )}
+                         {res === 'LAUGH' && (
+                           <>
+                             <BweiBlock isFlat={true} className="rotate-[15deg] scale-75" />
+                             <BweiBlock isFlat={true} className="-rotate-[15deg] scale-x-[-1] scale-75" />
+                           </>
+                         )}
+                         {res === 'YIN' && (
+                           <>
+                             <BweiBlock isFlat={false} className="rotate-[15deg] scale-75" />
+                             <BweiBlock isFlat={false} className="-rotate-[15deg] scale-x-[-1] scale-75" />
+                           </>
+                         )}
+                      </div>
+                      <span className={`font-black text-lg mb-1 leading-none ${c.text}`}>{c.label}</span>
                     </div>
                   );
                 })}
@@ -1365,14 +1400,24 @@ export default function App() {
         </div>
       )}
 
-      {/* 🌟 靜心房空中翻轉擲杯動畫 */}
+      {/* 🌟 靜心房空中翻滾筊杯動畫 (物理模擬雙重動畫) */}
       {gameData.gameState === 'BWA_BWEI_ROLLING' && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-8 bg-white/90 p-12 rounded-[4rem] backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-rose-100 animate-in zoom-in spin-in-3">
-            <div className="text-rose-500 font-black text-4xl animate-pulse drop-shadow-sm">🙏 誠心祈求中...</div>
-            <div className="flex gap-10">
-              <div className="w-24 h-24 bg-rose-400 rounded-t-full rounded-b-xl shadow-lg animate-[spin_0.5s_linear_infinite] drop-shadow-md border-4 border-white"></div>
-              <div className="w-24 h-24 bg-rose-500 rounded-t-full rounded-b-xl shadow-lg animate-[spin_0.5s_linear_infinite_reverse] drop-shadow-md border-4 border-white"></div>
+            <div className="text-rose-500 font-black text-4xl animate-pulse drop-shadow-sm">🙏 神明請指示...</div>
+            <div className="flex gap-12 h-32 items-center justify-center">
+              {/* 左邊筊杯：彈跳 + 旋轉 */}
+              <div className="animate-[bounce_0.4s_infinite_alternate]">
+                <div className="animate-[spin_0.3s_linear_infinite]">
+                   <BweiBlock isFlat={false} className="scale-[1.5]" />
+                </div>
+              </div>
+              {/* 右邊筊杯：反向彈跳 + 反向旋轉 (做水平翻轉形成對稱) */}
+              <div className="animate-[bounce_0.5s_infinite_alternate-reverse]">
+                <div className="animate-[spin_0.4s_linear_infinite_reverse]">
+                   <BweiBlock isFlat={true} className="scale-[1.5] scale-x-[-1]" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1462,7 +1507,6 @@ export default function App() {
                       return (
                         <div key={p.id} className={`absolute transition-all duration-500 ease-out pointer-events-auto flex flex-col items-center ${isActive ? 'z-50' : 'z-10'}`} style={{ transform: `translate(${tX}px, ${tY}px)` }}>
                           
-                          {/* 🌟 巨型泡泡計步器 - 已使用保護外框(w-24 flex justify-center)完美置中 */}
                           {gameData.gameState === 'MOVING' && gameData.currentPlayerIdx === p.id && gameData.remainingSteps > 0 && (
                             <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-[150] w-24 flex justify-center">
                               <div className="bg-sky-400 border-[6px] border-white text-white font-black rounded-full w-24 h-24 flex items-center justify-center text-[3rem] shadow-[0_10px_20px_rgba(0,0,0,0.15)] animate-bounce">
@@ -1501,7 +1545,6 @@ export default function App() {
                             )}
                           </div>
 
-                          {/* 🌟 懸浮操作選單 - 已使用隔離保護層完美置中且縮小尺寸 */}
                           {isMyTurnOnThisCell && p.id === activePlayerIndex && !myPlayer?.isBankrupt && gameData.gameState === 'IDLE' && (
                             <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 z-[200]">
                               <div className="flex flex-col items-center gap-3 animate-in slide-in-from-bottom-4 duration-300" style={{ transform: `scale(${1 / displayZoom})`, transformOrigin: 'bottom center' }}>
