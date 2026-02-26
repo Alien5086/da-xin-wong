@@ -120,6 +120,37 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
 
+// 🌟 新增：Web Audio API 音效合成器 (無須外部音檔，跨平台支援！)
+const audioCtx = typeof window !== 'undefined' ? new (window.AudioContext || window.webkitAudioContext)() : null;
+const playSound = (type, isMuted) => {
+  if (isMuted || !audioCtx) return;
+  // 瀏覽器安全機制：確保在使用者互動後啟動音效
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  
+  switch(type) {
+    case 'click':
+      osc.type = 'sine'; osc.frequency.setValueAtTime(600, now); osc.frequency.exponentialRampToValueAtTime(300, now + 0.1); gainNode.gain.setValueAtTime(0.1, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1); osc.start(now); osc.stop(now + 0.1); break;
+    case 'move':
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(400, now); osc.frequency.exponentialRampToValueAtTime(600, now + 0.1); gainNode.gain.setValueAtTime(0.1, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1); osc.start(now); osc.stop(now + 0.1); break;
+    case 'coin':
+      osc.type = 'sine'; osc.frequency.setValueAtTime(1200, now); osc.frequency.setValueAtTime(1600, now + 0.1); gainNode.gain.setValueAtTime(0.1, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3); osc.start(now); osc.stop(now + 0.3); break;
+    case 'bad':
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(300, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.4); gainNode.gain.setValueAtTime(0.1, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4); osc.start(now); osc.stop(now + 0.4); break;
+    case 'win':
+      osc.type = 'sine'; osc.frequency.setValueAtTime(400, now); osc.frequency.setValueAtTime(600, now + 0.1); osc.frequency.setValueAtTime(800, now + 0.2); gainNode.gain.setValueAtTime(0.1, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4); osc.start(now); osc.stop(now + 0.4); break;
+    case 'bwa':
+      osc.type = 'square'; osc.frequency.setValueAtTime(150, now); gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05); osc.start(now); osc.stop(now + 0.05); break;
+    case 'roll':
+      for(let i=0; i<6; i++) { const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.type = 'triangle'; o.frequency.setValueAtTime(300 + Math.random()*300, now + i*0.08); g.gain.setValueAtTime(0.1, now + i*0.08); g.gain.exponentialRampToValueAtTime(0.01, now + i*0.08 + 0.05); o.start(now + i*0.08); o.stop(now + i*0.08 + 0.05); } break;
+  }
+};
 
 const formatTime = (seconds) => {
   if (seconds === -1) return "不限時";
@@ -180,6 +211,10 @@ export default function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   
+  // 🌟 新增：背景音樂相關狀態與參考
+  const bgmRef = useRef(null);
+  const [bgmStarted, setBgmStarted] = useState(false);
+
   const [selectedSquareInfo, setSelectedSquareInfo] = useState(null);
 
   const [gameData, setGameData] = useState({
@@ -213,6 +248,44 @@ export default function App() {
         } catch (e) { console.error("Sync error", e); }
     }
   };
+
+  // 🌟 新增：初始化背景音樂引擎
+  useEffect(() => {
+    bgmRef.current = new Audio("https://dn721809.ca.archive.org/0/items/md_music_toy_story/13%20-%20Level%209%20-%20Food%20and%20Drink%20-%20Andy%20Blythe%2C%20Marten%20Joustra.mp3");
+    bgmRef.current.loop = true;  // 設定重複播放
+    bgmRef.current.volume = 0.1; // 🌟 將音量調小至 10%，作為柔和的背景點綴
+    return () => {
+      if (bgmRef.current) {
+        bgmRef.current.pause();
+        bgmRef.current.src = "";
+      }
+    };
+  }, []);
+
+  // 🌟 新增：監聽靜音按鈕與播放狀態
+  useEffect(() => {
+    if (!bgmRef.current) return;
+    if (isMuted) {
+      bgmRef.current.pause();
+    } else if (bgmStarted) {
+      bgmRef.current.play().catch(() => console.log("等待使用者互動以播放音樂"));
+    }
+  }, [isMuted, bgmStarted]);
+
+  // 🌟 新增：全域監聽第一次互動，優雅解除瀏覽器自動播放限制
+  useEffect(() => {
+    const handleInteraction = () => {
+      if (!bgmStarted) setBgmStarted(true);
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+    };
+    document.addEventListener('click', handleInteraction);
+    document.addEventListener('touchstart', handleInteraction);
+    return () => {
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+    };
+  }, [bgmStarted]);
 
   useEffect(() => {
     const el = mapRef.current;
@@ -345,6 +418,7 @@ export default function App() {
   }, [gameData.currentPlayerIdx, gameData.players[gameData.currentPlayerIdx]?.pos, isFullMapMode, displayZoom, viewportSize, appPhase, focusOnCurrentPlayer]);
 
   const handleStartLocalGame = async () => {
+    playSound('win', isMuted); // 🌟 播放開始遊戲音效
     setIsOfflineMode(true);
     const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
       id: i, 
@@ -366,6 +440,7 @@ export default function App() {
 
   const handleCreateRoom = async () => {
     if (!user) return;
+    playSound('win', isMuted); // 🌟 播放開始遊戲音效
     setIsOfflineMode(false);
     const id = Math.random().toString(36).substring(2, 8).toUpperCase();
     const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
@@ -387,6 +462,7 @@ export default function App() {
 
   const handleJoinRoom = async () => {
     if (!user || roomId.length < 4) return;
+    playSound('win', isMuted); // 🌟 播放加入遊戲音效
     setIsOfflineMode(false);
     try {
       const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
@@ -431,6 +507,8 @@ export default function App() {
   const handleRollDice = async () => {
     if (gameData.currentPlayerIdx !== activePlayerIndex) return;
 
+    playSound('roll', isMuted); // 🌟 播放擲骰子音效
+
     const d1 = Math.floor(Math.random() * 6) + 1;
     const d2 = Math.floor(Math.random() * 6) + 1;
     const steps = d1 + d2;
@@ -474,6 +552,7 @@ export default function App() {
         const player = gameData.players[activePlayerIndex];
         
         if (gameData.remainingSteps > 0) {
+          playSound('move', isMuted); // 🌟 播放移動腳步聲
           const targetPos = player.pos + 1;
           let newPos = targetPos % 40;
           let newMoney = player.money;
@@ -511,9 +590,11 @@ export default function App() {
     const newPlayers = [...gameData.players];
 
     if (sq.type === 'START') {
+      playSound('coin', isMuted); // 🌟 音效
       msg += `停在起點休息，沒有零用錢喔 😜`;
       nextState = 'END_TURN';
     } else if (sq.type === 'TAX') {
+      playSound('bad', isMuted); // 🌟 音效
       newPlayers[activePlayerIndex].money -= sq.amount;
       msg += `💸 繳納 ${sq.name} $${sq.amount}！`;
       nextState = 'END_TURN';
@@ -523,18 +604,22 @@ export default function App() {
       
       msg += `【 ${card.desc} 】\n\n`;
       if (card.goToJail) {
+         playSound('bad', isMuted); // 🌟 音效
          newPlayers[activePlayerIndex].pos = 10;
          newPlayers[activePlayerIndex].inJail = true;
          newPlayers[activePlayerIndex].jailRoundsLeft = -1; 
          msg += `直接送進反省泡泡！\n請誠心擲杯問神明。`;
          nextState = 'JAIL_BWA_BWEI'; 
       } else {
+         if (card.effectM > 0 || card.effectT > 0) playSound('win', isMuted); // 🌟 音效
+         else playSound('bad', isMuted); // 🌟 音效
          newPlayers[activePlayerIndex].money += card.effectM;
          newPlayers[activePlayerIndex].trust += card.effectT;
          msg += `資金 ${card.effectM > 0 ? '+'+card.effectM : card.effectM}\n信用 ${card.effectT > 0 ? '+'+card.effectT : card.effectT}`;
       }
       if (!card.goToJail) nextState = 'END_TURN';
     } else if (sq.type === 'GO_TO_JAIL' || sq.id === 30 || sq.type === 'JAIL' || sq.id === 10) {
+      playSound('bad', isMuted); // 🌟 音效
       newPlayers[activePlayerIndex].pos = 10;
       newPlayers[activePlayerIndex].inJail = true;
       newPlayers[activePlayerIndex].jailRoundsLeft = -1; 
@@ -545,27 +630,33 @@ export default function App() {
       if (ownerId !== undefined && ownerId !== activePlayerIndex) {
         const owner = newPlayers[ownerId];
         if (!owner.inJail && !owner.isBankrupt) { 
+           playSound('bad', isMuted); // 🌟 音效
            const rent = Math.floor(sq.price * 0.4);
            newPlayers[activePlayerIndex].money -= rent;
            newPlayers[ownerId].money += rent;
            msg += `踩到 ${owner.name} 的地盤，\n付過路費 $${rent} 給他吧！`;
         } else {
+           playSound('win', isMuted); // 🌟 音效
            msg += `幸運！ ${owner.name} ${owner.inJail ? '正在反省' : '已出局'}，免付過路費！ 🎉`;
         }
         nextState = 'END_TURN';
       } else if (ownerId === undefined) {
+        playSound('click', isMuted); // 🌟 音效
         msg += `來到空地：${sq.name} 🏕️`;
       } else {
+        playSound('click', isMuted); // 🌟 音效
         msg += `來到自己的 ${sq.name}，\n巡視一下產業！ 😎`;
         nextState = 'END_TURN';
       }
     } else {
+      playSound('click', isMuted); // 🌟 音效
       msg += `在 ${sq.name} 休息一天 💤`;
       nextState = 'END_TURN';
     }
 
     const bankruptCheck = checkBankruptcy(newPlayers);
     if (bankruptCheck.changed && bankruptCheck.newPlayers[activePlayerIndex].isBankrupt) {
+       playSound('bad', isMuted); // 🌟 音效
        msg += `\n\n🚨 哎呀！資金或信用歸零，你出局了！`;
        nextState = 'END_TURN';
     }
@@ -581,6 +672,7 @@ export default function App() {
 
   const handleThrowBwaBwei = async () => {
     if (gameData.currentPlayerIdx !== activePlayerIndex) return;
+    playSound('bwa', isMuted); // 🌟 播放擲杯音效
     await syncGameData({ gameState: 'BWA_BWEI_ROLLING' });
   };
 
@@ -611,11 +703,13 @@ export default function App() {
     
     let msg = `🎲 總共擲出【 ${holyCount} 次聖杯 】\n\n`;
     if (holyCount === 3) {
+      playSound('win', isMuted); // 🌟 音效
       newPlayers[activePlayerIndex].jailRoundsLeft = 0;
       newPlayers[activePlayerIndex].money -= 500;
       newPlayers[activePlayerIndex].inJail = false;
       msg += `✨ 神明原諒你了！\n(繳交罰款 $500)\n\n你重獲自由，下回合可正常玩囉！`;
     } else {
+      playSound('bad', isMuted); // 🌟 音效
       const waitRounds = 3 - holyCount; 
       newPlayers[activePlayerIndex].jailRoundsLeft = waitRounds;
       msg += `神明要你繼續反省...\n\n需在泡泡裡等待 ${waitRounds} 輪。`;
@@ -640,6 +734,7 @@ export default function App() {
       const reqTrust = Number(sq.reqTrust || 0);
 
       if (pMoney >= reqMoney && pTrust >= reqTrust) {
+        playSound('coin', isMuted); // 🌟 播放購買成功音效
         const newPlayers = [...gameData.players];
         newPlayers[activePlayerIndex].money -= reqMoney;
 
@@ -664,6 +759,8 @@ export default function App() {
         const sq = BOARD_SQUARES[sqId];
         if (!sq) return;
         
+        playSound('coin', isMuted); // 🌟 播放賣出音效
+
         const isHighTrust = player.trust > 10;
         const sellPrice = isHighTrust ? sq.price : Math.floor(sq.price / 2);
 
@@ -685,6 +782,8 @@ export default function App() {
          const player = gameData.players[activePlayerIndex];
          if (player.trust <= 1) return; 
          
+         playSound('coin', isMuted); // 🌟 播放換錢音效
+
          const isHighTrust = player.trust >= 10;
          const exchangeRate = isHighTrust ? 1000 : 500;
 
@@ -700,6 +799,7 @@ export default function App() {
 
   const handleEndTurn = async () => {
     try {
+      playSound('click', isMuted); // 🌟 播放結束回合點擊音效
       let newPlayers = [...gameData.players];
       let nextIdx = gameData.currentPlayerIdx;
       
