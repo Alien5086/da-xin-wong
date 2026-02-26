@@ -120,10 +120,14 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
 
-// 🌟 新增：Web Audio API 音效合成器
-const audioCtx = typeof window !== 'undefined' ? new (window.AudioContext || window.webkitAudioContext)() : null;
+
+// 🌟 修復 4：Web Audio API 延遲初始化 (解決 iOS 沒聲音的問題)
+let audioCtx = null;
 const playSound = (type, isMuted) => {
-  if (isMuted || !audioCtx) return;
+  if (isMuted || typeof window === 'undefined') return;
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
   if (audioCtx.state === 'suspended') audioCtx.resume();
   
   const now = audioCtx.currentTime;
@@ -489,6 +493,16 @@ export default function App() {
       const snap = await getDoc(roomRef);
       if (!snap.exists()) { setErrorMsg("找不到房號！"); return; }
       const data = snap.data();
+      
+      // 🌟 修復 1：斷線重連機制。如果玩家本來就在房間裡，直接恢復座位與畫面！
+      const existingSlot = data.players.findIndex(p => p.uid === user.uid);
+      if (existingSlot !== -1) {
+        setMyPlayerIndex(existingSlot);
+        setAppPhase('GAME');
+        if (data.timeLeft !== -1) setLocalTimeLeft(data.timeLeft);
+        return;
+      }
+
       const slot = data.players.findIndex(p => p.uid === null);
       if (slot === -1) { setErrorMsg("房間已滿！"); return; }
       
@@ -858,6 +872,13 @@ export default function App() {
       if (bankruptCheck.newPlayers[nextIdx].isBankrupt && nextPlayer.inJail === false) {
           msg += `\n🚨 資金或信用歸零，宣告破產！`;
           nextState = 'END_TURN';
+      }
+
+      // 🌟 修復 2：提早獲勝檢查。如果場上（已加入的玩家中）只剩一人沒破產，直接結束遊戲！
+      const joinedPlayers = bankruptCheck.newPlayers.filter(p => (isOfflineMode || p.uid !== null));
+      const alivePlayers = joinedPlayers.filter(p => !p.isBankrupt);
+      if (joinedPlayers.length > 1 && alivePlayers.length <= 1) {
+          nextState = 'GAME_OVER';
       }
 
       await syncGameData({
