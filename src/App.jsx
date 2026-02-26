@@ -1304,8 +1304,8 @@ export default function App() {
 
       {showExitConfirm && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto">
-          <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full mx-4 animate-in zoom-in-95 spin-in-1 border-[8px] border-rose-100">
-            <div className="text-rose-500 bg-rose-50 p-6 rounded-full border-4 border-white shadow-inner"><LogOut size={48} className="ml-1" strokeWidth={2.5}/></div>
+          <div className="bg-white p-8 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl flex flex-col items-center gap-4 md:gap-6 max-w-sm w-[92vw] max-h-[85vh] overflow-y-auto custom-scrollbar mx-4 animate-in zoom-in-95 spin-in-1 border-[6px] md:border-[8px] border-rose-100">
+            <div className="text-rose-500 bg-rose-50 p-5 md:p-6 rounded-full border-4 border-white shadow-inner shrink-0"><LogOut size={48} className="ml-1" strokeWidth={2.5}/></div>
             <h3 className="text-3xl font-black text-slate-700">要離開遊戲嗎？🥺</h3>
             <p className="text-slate-400 text-center text-lg">離開後目前的進度就不見囉！</p>
             <div className="flex gap-4 w-full mt-4">
@@ -1318,8 +1318,8 @@ export default function App() {
 
       {selectedSquareInfo !== null && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setSelectedSquareInfo(null)}>
-          <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 w-full max-w-sm animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setSelectedSquareInfo(null)} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3}/></button>
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[6px] md:border-[8px] border-sky-100 w-[92vw] max-w-sm max-h-[85vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative pt-12 md:pt-14" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setSelectedSquareInfo(null)} className="absolute top-3 right-3 md:top-4 md:right-4 text-white bg-rose-400 rounded-full p-1.5 md:p-2 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform z-50"><X size={24} strokeWidth={3}/></button>
             
             {(() => {
                const sq = BOARD_SQUARES[selectedSquareInfo];
@@ -1382,8 +1382,8 @@ export default function App() {
 
       {showAssetManager && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setShowAssetManager(false)}>
-          <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-amber-100 w-full max-w-sm animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setShowAssetManager(false)} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3}/></button>
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[6px] md:border-[8px] border-amber-100 w-[92vw] max-w-sm max-h-[85vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative pt-12 md:pt-14" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setShowAssetManager(false)} className="absolute top-3 right-3 md:top-4 md:right-4 text-white bg-rose-400 rounded-full p-1.5 md:p-2 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform z-50"><X size={24} strokeWidth={3}/></button>
 
               <div className="flex flex-col items-center border-b-4 border-dashed border-amber-100 pb-4 mb-4">
                   <div className="w-16 h-16 bg-amber-50 rounded-full border-4 border-amber-200 flex items-center justify-center text-4xl mb-2 shadow-inner">💼</div>
@@ -1443,7 +1443,7 @@ export default function App() {
       )}
 
       {gameData.currentPlayerIdx === activePlayerIndex && !myPlayer?.isBankrupt && ['JAIL_BWA_BWEI', 'ACTION', 'END_TURN'].includes(gameData.gameState) && (
-        <div className="fixed bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 z-[250] bg-white/95 backdrop-blur-md p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-[0_25px_50px_rgba(0,0,0,0.1)] border-[6px] md:border-[8px] border-sky-100 w-[92vw] md:min-w-[380px] max-w-md max-h-[75vh] overflow-y-auto custom-scrollbar text-center animate-in slide-in-from-bottom-8 duration-300 pointer-events-auto flex flex-col items-center gap-4 md:gap-6 relative">
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[250] bg-white/95 backdrop-blur-md p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-[0_25px_50px_rgba(0,0,0,0.2)] border-[6px] md:border-[8px] border-sky-100 w-[95vw] md:min-w-[460px] max-w-[520px] text-center animate-in zoom-in-95 duration-300 pointer-events-auto flex flex-col items-center gap-4 md:gap-6 relative">
           
           {myPlayer?.isAI && (
             <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-[300] flex items-center justify-center rounded-[1.5rem] md:rounded-[2.5rem]">
