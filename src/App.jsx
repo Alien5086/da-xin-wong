@@ -883,7 +883,16 @@ export default function App() {
 
   if (appPhase === 'LANDING') {
     return (
-      <div className="min-h-screen w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-4 md:p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
+      <div className="min-h-[100dvh] w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-4 md:p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
+        
+        {/* 開頭選單專屬的音樂開關按鈕 (右上角) */}
+        <button 
+          onClick={() => setIsMuted(!isMuted)} 
+          className={`absolute top-4 right-4 md:top-8 md:right-8 z-[100] w-14 h-14 md:w-16 md:h-16 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 ${isMuted ? 'bg-slate-300 text-slate-600 border-white' : 'bg-white/90 text-amber-500 hover:scale-110 active:scale-95 border-amber-100'}`}
+        >
+          {isMuted ? <VolumeX size={32} strokeWidth={3}/> : <Volume2 size={32} strokeWidth={3}/>}
+        </button>
+
         <style>{`
           .custom-scrollbar::-webkit-scrollbar { width: 6px; }
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -1096,7 +1105,7 @@ export default function App() {
      });
 
      return (
-        <div className="min-h-screen w-screen bg-[#fff8e7] flex flex-col items-center justify-center p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
+        <div className="min-h-[100dvh] w-screen bg-[#fff8e7] flex flex-col items-center justify-center p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
             <PartyPopper size={120} className="text-pink-400 mb-6 animate-bounce drop-shadow-md" />
             <h1 className="text-[5rem] font-black mb-10 text-amber-500 drop-shadow-[0_6px_0_rgba(217,119,6,0.2)]">遊戲結束囉！🎉</h1>
             <div className="bg-white p-10 rounded-[3rem] w-full max-w-xl shadow-[0_20px_50px_rgba(0,0,0,0.05)] border-[8px] border-amber-200 relative">
@@ -1135,7 +1144,7 @@ export default function App() {
   const safeDice = displayDice || [1, 1];
 
   return (
-    <div className="h-screen w-screen bg-[#e0f2fe] overflow-hidden relative touch-none select-none font-black text-[#4a3424] flex flex-col">
+    <div className="h-[100dvh] w-screen bg-[#e0f2fe] overflow-hidden relative touch-none select-none font-black text-[#4a3424] flex flex-col">
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -1180,7 +1189,7 @@ export default function App() {
         ))}
       </div>
 
-      <div className="absolute right-6 bottom-6 flex flex-col items-center z-[150] pointer-events-auto">
+      <div className="absolute right-4 bottom-24 md:right-6 md:bottom-8 flex flex-col items-center z-[150] pointer-events-auto">
         <div className={`flex flex-col items-center gap-3 overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-[600px] opacity-100 pb-3' : 'max-h-0 opacity-0 pb-0 pointer-events-none'}`}>
           <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
