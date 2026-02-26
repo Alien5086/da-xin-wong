@@ -1189,37 +1189,47 @@ export default function App() {
         ))}
       </div>
 
-      <div className="absolute right-4 bottom-24 md:right-6 md:bottom-8 flex flex-col items-center z-[150] pointer-events-auto">
-        <div className={`flex flex-col items-center gap-3 overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-[600px] opacity-100 pb-3' : 'max-h-0 opacity-0 pb-0 pointer-events-none'}`}>
-          <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-          </button>
-          <button onClick={focusOnCurrentPlayer} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
-            <Target size={38} strokeWidth={3}/>
-          </button>
-          <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.4))} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-          </button>
-          <button onClick={() => setIsFullMapMode(!isFullMapMode)} className={`w-16 h-16 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 shrink-0 ${isFullMapMode ? 'bg-sky-400 text-white border-white scale-110' : 'bg-white/90 text-sky-500 hover:scale-110 active:scale-95 border-sky-100'}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+      <div className="absolute right-4 bottom-24 md:right-6 md:bottom-8 flex flex-col items-end z-[150] pointer-events-auto">
+        <div className={`flex flex-col items-end gap-3 overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-[800px] opacity-100 pb-3' : 'max-h-0 opacity-0 pb-0 pointer-events-none'}`}>
+          
+          <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="h-16 md:h-20 px-5 md:px-6 bg-white/95 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 text-sky-600 hover:scale-105 active:scale-95 transition-all border-[4px] border-sky-100 shrink-0 origin-right">
+            <span className="font-black text-lg md:text-xl whitespace-nowrap">放大畫面</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" className="md:w-[42px] md:h-[42px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
           </button>
           
-          <div className="w-8 h-1.5 bg-sky-200/50 mx-auto my-0.5 rounded-full shrink-0"></div>
+          <button onClick={focusOnCurrentPlayer} className="h-16 md:h-20 px-5 md:px-6 bg-white/95 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 text-sky-600 hover:scale-105 active:scale-95 transition-all border-[4px] border-sky-100 shrink-0 origin-right">
+            <span className="font-black text-lg md:text-xl whitespace-nowrap">尋找玩家</span>
+            <Target size={36} className="md:w-[42px] md:h-[42px] shrink-0" strokeWidth={3}/>
+          </button>
+          
+          <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.4))} className="h-16 md:h-20 px-5 md:px-6 bg-white/95 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 text-sky-600 hover:scale-105 active:scale-95 transition-all border-[4px] border-sky-100 shrink-0 origin-right">
+            <span className="font-black text-lg md:text-xl whitespace-nowrap">縮小畫面</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" className="md:w-[42px] md:h-[42px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          
+          <button onClick={() => setIsFullMapMode(!isFullMapMode)} className={`h-16 md:h-20 px-5 md:px-6 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 transition-all border-[4px] shrink-0 origin-right ${isFullMapMode ? 'bg-sky-400 text-white border-white scale-105' : 'bg-white/95 text-sky-600 hover:scale-105 active:scale-95 border-sky-100'}`}>
+            <span className="font-black text-lg md:text-xl whitespace-nowrap">{isFullMapMode ? '跟隨玩家' : '全覽地圖'}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" className="md:w-[42px] md:h-[42px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+          </button>
+          
+          <div className="w-12 h-1.5 bg-sky-200/50 my-1 rounded-full shrink-0 mr-4 md:mr-7"></div>
 
-          <button onClick={() => setIsMuted(!isMuted)} className={`w-16 h-16 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 shrink-0 ${isMuted ? 'bg-slate-300 text-slate-600 border-white' : 'bg-white/90 text-amber-500 hover:scale-110 active:scale-95 border-amber-100'}`}>
-            {isMuted ? <VolumeX size={42} strokeWidth={3}/> : <Volume2 size={42} strokeWidth={3}/>}
+          <button onClick={() => setIsMuted(!isMuted)} className={`h-16 md:h-20 px-5 md:px-6 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 transition-all border-[4px] shrink-0 origin-right ${isMuted ? 'bg-slate-300 text-slate-600 border-white' : 'bg-white/95 text-amber-500 hover:scale-105 active:scale-95 border-amber-100'}`}>
+            <span className="font-black text-lg md:text-xl whitespace-nowrap">{isMuted ? '開啟音效' : '關閉音效'}</span>
+            {isMuted ? <VolumeX size={36} className="md:w-[42px] md:h-[42px] shrink-0" strokeWidth={3}/> : <Volume2 size={36} className="md:w-[42px] md:h-[42px] shrink-0" strokeWidth={3}/>}
           </button>
 
-          <button onClick={() => setShowExitConfirm(true)} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-rose-400 hover:bg-rose-50 hover:scale-110 active:scale-95 transition-all border-4 border-rose-100 shrink-0">
-            <LogOut size={38} strokeWidth={3} className="ml-1"/>
+          <button onClick={() => setShowExitConfirm(true)} className="h-16 md:h-20 px-5 md:px-6 bg-white/95 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 text-rose-500 hover:bg-rose-50 hover:scale-105 active:scale-95 transition-all border-[4px] border-rose-100 shrink-0 origin-right">
+            <span className="font-black text-lg md:text-xl whitespace-nowrap">離開遊戲</span>
+            <LogOut size={36} className="md:w-[42px] md:h-[42px] shrink-0 ml-1" strokeWidth={3}/>
           </button>
         </div>
 
         <button 
           onClick={() => setIsMenuOpen(!isMenuOpen)} 
-          className={`w-20 h-20 rounded-full shadow-[0_5px_20px_rgba(0,0,0,0.15)] flex items-center justify-center transition-all duration-300 border-[5px] mt-1 z-10 ${isMenuOpen ? 'bg-sky-400 text-white border-white rotate-90 scale-95' : 'bg-white/95 backdrop-blur-md text-sky-500 border-sky-200 hover:scale-105'}`}
+          className={`w-20 h-20 md:w-24 md:h-24 rounded-full shadow-[0_5px_20px_rgba(0,0,0,0.15)] flex items-center justify-center transition-all duration-300 border-[5px] mt-2 z-10 origin-center ${isMenuOpen ? 'bg-sky-400 text-white border-white rotate-90 scale-95' : 'bg-white/95 backdrop-blur-md text-sky-500 border-sky-200 hover:scale-105'}`}
         >
-          {isMenuOpen ? <X size={44} strokeWidth={3} /> : <Menu size={44} strokeWidth={3} />}
+          {isMenuOpen ? <X size={44} className="md:w-[52px] md:h-[52px]" strokeWidth={3} /> : <Menu size={44} className="md:w-[52px] md:h-[52px]" strokeWidth={3} />}
         </button>
       </div>
 
