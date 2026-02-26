@@ -120,6 +120,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
 
+
 const formatTime = (seconds) => {
   if (seconds === -1) return "不限時";
   const m = Math.floor(seconds / 60);
@@ -1121,32 +1122,40 @@ export default function App() {
           <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-amber-100 w-full max-w-sm animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative" onClick={e => e.stopPropagation()}>
               <button onClick={() => setShowAssetManager(false)} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3}/></button>
 
-              <div className="flex flex-col items-center border-b-4 border-dashed border-amber-100 pb-6 mb-6">
-                  <div className="w-20 h-20 bg-amber-50 rounded-full border-4 border-amber-200 flex items-center justify-center text-5xl mb-3 shadow-inner">💼</div>
-                  <h3 className="font-black text-3xl text-amber-700">小金庫與資產</h3>
-                  {isOfflineMode && <div className="text-amber-500 text-lg mt-1">({myPlayer?.name} 的包包)</div>}
+              <div className="flex flex-col items-center border-b-4 border-dashed border-amber-100 pb-4 mb-4">
+                  <div className="w-16 h-16 bg-amber-50 rounded-full border-4 border-amber-200 flex items-center justify-center text-4xl mb-2 shadow-inner">💼</div>
+                  <h3 className="font-black text-2xl text-amber-700">小金庫與資產</h3>
+                  {isOfflineMode && <div className="text-amber-500 text-base mt-1">({myPlayer?.name} 的包包)</div>}
               </div>
               
-              <div className="mb-6 bg-emerald-50 p-5 rounded-[2rem] border-4 border-white shadow-sm flex justify-between items-center relative overflow-hidden">
-                 <div className="absolute -right-4 -top-4 text-[5rem] opacity-10">💰</div>
-                 <div className="text-emerald-800 text-xl">目前資金</div>
-                 <div className="font-black text-4xl text-emerald-500">${myPlayer?.money || 0}</div>
+              {/* 🌟 全新雙欄資產顯示區：左邊資金、右邊信用 */}
+              <div className="flex gap-3 mb-5">
+                 <div className="flex-1 bg-emerald-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm flex flex-col items-center relative overflow-hidden">
+                    <div className="absolute -right-2 -bottom-4 text-[4rem] opacity-10">💰</div>
+                    <div className="text-emerald-800 font-bold text-sm mb-1 z-10">目前資金</div>
+                    <div className="font-black text-2xl text-emerald-500 z-10">${myPlayer?.money || 0}</div>
+                 </div>
+                 <div className="flex-1 bg-amber-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm flex flex-col items-center relative overflow-hidden">
+                    <div className="absolute -right-2 -bottom-4 text-[4rem] opacity-10">⭐</div>
+                    <div className="text-amber-800 font-bold text-sm mb-1 z-10">目前信用</div>
+                    <div className="font-black text-2xl text-amber-500 z-10 flex items-center gap-1"><Star size={20} fill="currentColor"/>{myPlayer?.trust || 0}</div>
+                 </div>
               </div>
 
-              <div className="mb-6">
-                  <div className="text-slate-400 mb-2 text-center">🌟 拿信用換點零用錢？ (1點換現金)</div>
+              <div className="mb-5">
+                  <div className="text-slate-400 mb-2 text-center text-sm font-bold">🌟 拿 1 點信用換零用錢</div>
                   <button 
                      onClick={handleMortgageTrust}
                      disabled={myPlayer?.trust <= 1}
-                     className={`w-full py-5 rounded-[2rem] text-2xl shadow-[0_6px_0_0_rgba(0,0,0,0.1)] active:translate-y-[6px] active:shadow-none active:border-b-0 transition-all flex items-center justify-center gap-3 border-[4px] border-white ${myPlayer?.trust > 1 ? 'bg-amber-400 text-amber-900 hover:bg-amber-300 cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                     className={`w-full py-4 rounded-[1.5rem] text-xl shadow-[0_5px_0_0_rgba(0,0,0,0.1)] active:translate-y-[5px] active:shadow-none active:border-b-0 transition-all flex items-center justify-center gap-2 border-[4px] border-white ${myPlayer?.trust > 1 ? 'bg-amber-400 text-amber-900 hover:bg-amber-300 cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                   >
-                     <Star size={28} fill="currentColor"/> 
+                     <Star size={24} fill="currentColor"/> 
                      {myPlayer?.trust >= 10 ? '換取 $1000' : '換取 $500'}
                   </button>
               </div>
 
               <div>
-                  <div className="text-slate-400 mb-3 text-center">🏠 變賣手上的地產？</div>
+                  <div className="text-slate-400 mb-3 text-center text-sm font-bold">🏠 變賣手上的地產？</div>
                   {myProperties.length === 0 ? (
                       <div className="text-center text-slate-300 text-lg py-8 bg-slate-50 rounded-[2rem] border-4 border-dashed border-slate-200">包包裡空空的 🥺</div>
                   ) : (
