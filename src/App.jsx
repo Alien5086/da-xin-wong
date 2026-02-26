@@ -128,9 +128,30 @@ const formatTime = (seconds) => {
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-const getOwnerBgColor = (colorClass) => {
-  // 對應淡色系
-  return colorClass.replace('300', '200').replace('400', '200');
+// 🌟 新增：取得玩家專屬的「超淡背景色」，讓底圖染色同時保持文字清晰
+const getOwnerBodyClass = (colorClass) => {
+  const map = {
+    'bg-sky-300': 'bg-sky-100',
+    'bg-rose-300': 'bg-rose-100',
+    'bg-emerald-300': 'bg-emerald-100',
+    'bg-purple-300': 'bg-purple-100',
+    'bg-orange-300': 'bg-orange-100',
+    'bg-pink-300': 'bg-pink-100',
+  };
+  return map[colorClass] || 'bg-slate-100';
+};
+
+// 🌟 新增：取得玩家專屬的「外框顏色」
+const getOwnerBorderClass = (colorClass) => {
+  const map = {
+    'bg-sky-300': 'border-sky-300',
+    'bg-rose-300': 'border-rose-300',
+    'bg-emerald-300': 'border-emerald-300',
+    'bg-purple-300': 'border-purple-300',
+    'bg-orange-300': 'border-orange-300',
+    'bg-pink-300': 'border-pink-300',
+  };
+  return map[colorClass] || 'border-slate-300';
 };
 
 const DiceIcon = ({ value, ...props }) => {
@@ -181,7 +202,7 @@ export default function App() {
 
   const dragStatus = useRef({ isDragging: false, startX: 0, startY: 0, initX: 0, initY: 0, moved: false });
   const mapRef = useRef(null);
-  const MAP_SIZE = 1800; // 稍微再加大一點以適應更粗的邊框
+  const MAP_SIZE = 1900; // 🌟 再次加大地圖尺寸，讓格子內部有更充裕的空間
 
   const activePlayerIndex = isOfflineMode ? gameData.currentPlayerIdx : myPlayerIndex;
 
@@ -302,10 +323,11 @@ export default function App() {
     const { row, col } = GRID_ORDER[currP.pos];
     const CELL_SIZE = MAP_SIZE / 11;
     
-    // 讓鏡頭追蹤時，玩家稍微偏下 (45%) 留出上方大氣泡的空間
+    // 🌟 關鍵修復：將 Y 軸對焦中心點往下移至螢幕 65% 處 (中下方)
+    // 這樣人物會停在畫面下方，徹底釋放上方空間，大按鈕與大氣泡就不會再撞到頂部 UI
     setCameraOffset({ 
       x: viewportSize.w / 2 - ((col - 1) * CELL_SIZE + CELL_SIZE / 2) * displayZoom, 
-      y: viewportSize.h * 0.45 - ((row - 1) * CELL_SIZE + CELL_SIZE / 2) * displayZoom 
+      y: viewportSize.h * 0.65 - ((row - 1) * CELL_SIZE + CELL_SIZE / 2) * displayZoom 
     });
     setManualOffset({ x: 0, y: 0 }); 
   }, [gameData.players, gameData.currentPlayerIdx, viewportSize, zoom]);
@@ -798,7 +820,8 @@ export default function App() {
                   <div className="w-full border-t-[3px] border-dashed border-sky-100"></div>
                   <div className="w-full bg-sky-50 rounded-[2rem] p-5 border-4 border-white shadow-sm">
                     <div className="text-center text-sky-800 mb-4 text-lg">選一個喜歡的角色吧！👇</div>
-                    <div className="flex justify-center gap-3 mb-5">
+                    {/* 🌟 加入 flex-wrap 讓 5 人或 6 人遊玩時能自動往下換行，解決破版問題 */}
+                    <div className="flex flex-wrap justify-center gap-3 mb-5">
                       {Array.from({ length: setupPlayerCount }).map((_, i) => (
                         <div key={i} className="flex flex-col items-center gap-2">
                           <button 
@@ -1181,7 +1204,11 @@ export default function App() {
               const owner = gameData.properties ? gameData.players.find(p => gameData.properties[idx] === p.id) : null;
               const activePlayersHere = gameData.players.filter(p => p.pos === idx && p.uid !== null && !p.isBankrupt);
               
-              let contentClass = "flex-1 flex flex-col items-center justify-center p-2 relative w-full h-full bg-white z-10";
+              // 🌟 判斷這塊地有沒有主人，並套用專屬的底圖顏色與邊框顏色
+              const bodyBg = owner ? getOwnerBodyClass(owner.color) : 'bg-white';
+              const borderClass = owner ? getOwnerBorderClass(owner.color) : 'border-white';
+
+              let contentClass = `flex-1 flex flex-col items-center justify-center p-2 relative w-full h-full ${bodyBg} z-10`;
 
               const isActiveCell = activePlayersHere.some(p => p.id === gameData.currentPlayerIdx);
               const isMyTurnOnThisCell = isActiveCell && gameData.currentPlayerIdx === activePlayerIndex;
@@ -1204,25 +1231,26 @@ export default function App() {
                            setSelectedSquareInfo(idx);
                        }
                     }}
-                    className="rounded-[1.5rem] relative flex flex-col overflow-hidden shadow-sm z-10 border-4 border-white border-b-[8px] bg-white cursor-pointer hover:scale-[1.03] transition-transform pointer-events-auto" 
+                    className={`rounded-[1.5rem] relative flex flex-col overflow-hidden shadow-sm z-10 border-4 border-b-[8px] cursor-pointer hover:scale-[1.03] transition-transform pointer-events-auto ${borderClass}`} 
                     style={{ gridRow: row, gridColumn: col }}
                   >
                     
+                    {/* 🌟 頂部顏色區塊：有主人時直接變成主人的鮮豔代表色 */}
                     {sq.type === 'PROPERTY' && (
-                      <div className={`h-[25%] min-h-[25%] w-full ${owner ? getOwnerBgColor(owner.color) : sq.color} border-b-4 border-white/50 z-0 shrink-0`}></div>
+                      <div className={`h-[20%] min-h-[20%] w-full ${owner ? owner.color : sq.color} border-b-4 border-white/50 z-0 shrink-0`}></div>
                     )}
 
                     <div className={contentClass}>
-                      <span className="font-black text-slate-700 text-[1.6rem] leading-tight text-center mt-1 drop-shadow-sm">{sq.name}</span>
+                      <span className="font-black text-slate-700 text-2xl leading-tight text-center mt-1 drop-shadow-sm">{sq.name}</span>
                       
-                      {sq.type === 'START' && <span className="text-emerald-700 font-black text-xl leading-tight mt-1 bg-emerald-100 px-4 py-1 rounded-full border-2 border-emerald-300">領 $500</span>}
-                      {sq.type === 'TAX' && <span className="text-rose-700 font-black text-xl leading-tight mt-1 bg-rose-100 px-4 py-1 rounded-full border-2 border-rose-300">繳 ${sq.amount}</span>}
+                      {sq.type === 'START' && <span className="text-emerald-700 font-black text-lg leading-tight mt-1 bg-emerald-100 px-3 py-0.5 rounded-full border-2 border-emerald-300">領 $500</span>}
+                      {sq.type === 'TAX' && <span className="text-rose-700 font-black text-lg leading-tight mt-1 bg-rose-100 px-3 py-0.5 rounded-full border-2 border-rose-300">繳 ${sq.amount}</span>}
                       
-                      {sq.price && <span className="text-sky-600 font-black text-2xl leading-tight mt-1">${sq.price}</span>}
+                      {sq.price && <span className="text-sky-600 font-black text-xl leading-tight mt-1">${sq.price}</span>}
                       
                       {sq.reqTrust > 0 && (
-                        <div className="mt-1 bg-amber-50 text-amber-600 text-sm font-black px-3 py-0.5 rounded-full border-2 border-amber-300 flex items-center justify-center gap-1 shadow-sm">
-                          <Star size={16} fill="currentColor"/> {sq.reqTrust}
+                        <div className="mt-1 bg-amber-50 text-amber-600 text-xs font-black px-2 py-0.5 rounded-full border-2 border-amber-300 flex items-center justify-center gap-1 shadow-sm">
+                          <Star size={14} fill="currentColor"/> {sq.reqTrust} 點
                         </div>
                       )}
                     </div>
@@ -1281,23 +1309,23 @@ export default function App() {
                             )}
                           </div>
 
-                          {/* 🌟 懸浮操作選單 (糖果果凍按鈕) */}
+                          {/* 🌟 懸浮操作選單 (縮小尺寸與間距，不再遮擋上方玩家資訊列) */}
                           {isMyTurnOnThisCell && p.id === activePlayerIndex && !myPlayer?.isBankrupt && gameData.gameState === 'IDLE' && (
-                            <div className="absolute bottom-full mb-8 left-1/2 flex flex-col items-center gap-4 z-[200] animate-in slide-in-from-bottom-8 duration-300" style={{ transform: `translateX(-50%) scale(${1 / displayZoom})`, transformOrigin: 'bottom center' }}>
+                            <div className="absolute bottom-full mb-4 left-1/2 flex flex-col items-center gap-3 z-[200] animate-in slide-in-from-bottom-4 duration-300" style={{ transform: `translateX(-50%) scale(${1 / displayZoom})`, transformOrigin: 'bottom center' }}>
                               
                               {gameData.actionMessage && (
-                                <div className="bg-white/95 text-slate-700 font-black px-8 py-4 rounded-[2rem] shadow-[0_10px_20px_rgba(0,0,0,0.05)] text-2xl mb-2 text-center whitespace-pre-line border-4 border-sky-100">
+                                <div className="bg-white/95 text-slate-700 font-black px-6 py-3 rounded-[1.5rem] shadow-[0_5px_15px_rgba(0,0,0,0.05)] text-xl mb-1 text-center whitespace-pre-line border-4 border-sky-100">
                                   {gameData.actionMessage}
                                 </div>
                               )}
                               
                               {myPlayer?.jailRoundsLeft === -1 ? (
-                                <button onClick={() => syncGameData({ gameState: 'JAIL_BWA_BWEI', bwaBweiResults: [] })} className="whitespace-nowrap px-10 py-6 bg-rose-400 hover:bg-rose-300 text-white rounded-[3rem] font-black text-4xl shadow-[0_10px_0_0_#e11d48,0_15px_20px_rgba(0,0,0,0.1)] active:shadow-none active:translate-y-[10px] active:border-b-0 transition-all flex items-center gap-3 border-[6px] border-white">
-                                  🙏 開始擲杯請示！
+                                <button onClick={() => syncGameData({ gameState: 'JAIL_BWA_BWEI', bwaBweiResults: [] })} className="whitespace-nowrap px-8 py-4 bg-rose-400 hover:bg-rose-300 text-white rounded-[2rem] font-black text-3xl shadow-[0_8px_0_0_#e11d48,0_10px_20px_rgba(0,0,0,0.1)] active:shadow-none active:translate-y-[8px] active:border-b-0 transition-all flex items-center gap-3 border-[4px] border-white">
+                                  🙏 開始擲杯！
                                 </button>
                               ) : (
-                                <button onClick={handleRollDice} className="whitespace-nowrap px-12 py-6 bg-sky-400 hover:bg-sky-300 text-white rounded-[3rem] font-black text-5xl shadow-[0_12px_0_0_#0284c7,0_15px_25px_rgba(0,0,0,0.15)] active:shadow-none active:translate-y-[12px] active:border-b-0 transition-all flex items-center gap-4 border-[6px] border-white animate-bounce">
-                                  <Dice5 size={48} strokeWidth={3}/> 擲骰子出發！
+                                <button onClick={handleRollDice} className="whitespace-nowrap px-8 py-4 bg-sky-400 hover:bg-sky-300 text-white rounded-[2rem] font-black text-3xl shadow-[0_8px_0_0_#0284c7,0_10px_20px_rgba(0,0,0,0.15)] active:shadow-none active:translate-y-[8px] active:border-b-0 transition-all flex items-center gap-3 border-[4px] border-white animate-bounce">
+                                  <Dice5 size={32} strokeWidth={3}/> 擲骰子
                                 </button>
                               )}
                             </div>
