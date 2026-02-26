@@ -218,6 +218,10 @@ export default function App() {
   const [setupTimeLimit, setSetupTimeLimit] = useState(600);
   const [setupAvatar, setSetupAvatar] = useState(CHILD_AVATARS[0]);
   
+  // 🌟 新增：用來儲存玩家自訂名字的 State
+  const [setupName, setSetupName] = useState('玩家 1');
+  const [localNames, setLocalNames] = useState(['玩家 1', '玩家 2', '玩家 3', '玩家 4', '玩家 5', '玩家 6']);
+
   const [localAvatars, setLocalAvatars] = useState([CHILD_AVATARS[0], CHILD_AVATARS[1], CHILD_AVATARS[2], CHILD_AVATARS[3], CHILD_AVATARS[4], CHILD_AVATARS[5]]);
   const [editingLocalPlayer, setEditingLocalPlayer] = useState(0);
 
@@ -438,7 +442,7 @@ export default function App() {
     setIsOfflineMode(true);
     const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
       id: i, 
-      name: `玩家 ${i + 1}`, 
+      name: localNames[i].trim() || `玩家 ${i + 1}`, // 🌟 套用自訂名字，如果空白則用預設
       icon: localAvatars[i], 
       color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
       pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
@@ -461,7 +465,7 @@ export default function App() {
     const id = Math.random().toString(36).substring(2, 8).toUpperCase();
     const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
       id: i, 
-      name: `玩家 ${i + 1}`, 
+      name: i === 0 ? (setupName.trim() || '房主') : `玩家 ${i + 1}`, // 🌟 套用房主自訂名字
       icon: i === 0 ? setupAvatar : '⏳', 
       color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i],
       pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
@@ -490,6 +494,7 @@ export default function App() {
       
       data.players[slot].uid = user.uid;
       data.players[slot].icon = setupAvatar;
+      data.players[slot].name = setupName.trim() || `玩家 ${slot + 1}`; // 🌟 套用加入者的名字
       data.players[slot].inJail = false; 
       
       await updateDoc(roomRef, { players: data.players });
@@ -936,11 +941,12 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* 右側：專屬角色設定 */}
                 <div className="flex-[1.2] flex flex-col">
                   {setupMode === 'LOCAL' ? (
                     <div className="w-full bg-sky-50 rounded-[2rem] p-4 md:p-5 border-4 border-white shadow-sm h-full flex flex-col">
-                      <div className="text-center text-sky-800 mb-2 md:mb-3 text-base md:text-lg">選一個喜歡的角色吧！👇</div>
-                      <div className="flex flex-wrap justify-center gap-2 md:gap-3 mb-2 md:mb-4">
+                      <div className="text-center text-sky-800 mb-2 md:mb-3 text-base md:text-lg">幫角色取名字＆換頭像吧！👇</div>
+                      <div className="flex flex-wrap justify-center gap-2 md:gap-3 mb-3 md:mb-4">
                         {Array.from({ length: setupPlayerCount }).map((_, i) => (
                           <div key={i} className="flex flex-col items-center gap-1 md:gap-2">
                             <button 
@@ -949,9 +955,25 @@ export default function App() {
                             >
                               {localAvatars[i]}
                             </button>
-                            <span className="text-[10px] md:text-xs text-sky-600 bg-white px-2 py-0.5 rounded-full border-2 border-sky-100">P{i+1}</span>
+                            {/* 🌟 顯示該玩家目前設定的名字 */}
+                            <span className="text-[10px] md:text-xs text-sky-600 bg-white px-2 py-0.5 rounded-full border-2 border-sky-100 max-w-[60px] truncate">{localNames[i]}</span>
                           </div>
                         ))}
+                      </div>
+
+                      {/* 🌟 新增：名字輸入框 */}
+                      <div className="mb-3 w-full max-w-[200px] mx-auto">
+                        <input 
+                          type="text" 
+                          value={localNames[editingLocalPlayer]} 
+                          onChange={e => {
+                            const newNames = [...localNames];
+                            newNames[editingLocalPlayer] = e.target.value.substring(0, 6); // 限制6個字
+                            setLocalNames(newNames);
+                          }} 
+                          placeholder={`玩家 ${editingLocalPlayer + 1} 名字`}
+                          className="w-full bg-white px-3 py-2 rounded-xl text-center text-sm md:text-base font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors"
+                        />
                       </div>
 
                       <div className="flex flex-wrap justify-center gap-2 max-h-24 md:max-h-32 overflow-y-auto p-2 bg-white rounded-[1.5rem] border-2 border-sky-100 custom-scrollbar mt-auto">
@@ -975,7 +997,19 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="w-full bg-sky-50 rounded-[2rem] p-5 md:p-6 border-4 border-white shadow-sm h-full flex flex-col justify-center">
-                      <div className="text-center text-sky-800 mb-3 md:mb-4 text-lg md:text-xl">選一個喜歡的角色吧！</div>
+                      <div className="text-center text-sky-800 mb-2 md:mb-3 text-lg md:text-xl">你的專屬角色與名字！</div>
+                      
+                      {/* 🌟 新增：名字輸入框 */}
+                      <div className="mb-4 w-full max-w-[200px] mx-auto">
+                        <input 
+                          type="text" 
+                          value={setupName} 
+                          onChange={e => setSetupName(e.target.value.substring(0, 6))} 
+                          placeholder="輸入你的名字"
+                          className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors"
+                        />
+                      </div>
+
                       <div className="flex flex-wrap justify-center gap-2 md:gap-3 max-h-36 md:max-h-48 overflow-y-auto p-2 custom-scrollbar">
                         {CHILD_AVATARS.map(avatar => (
                           <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-12 h-12 md:w-16 md:h-16 rounded-full text-3xl md:text-4xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}>
@@ -1011,7 +1045,19 @@ export default function App() {
 
                 <div className="flex-[1.2] flex flex-col">
                   <div className="w-full bg-sky-50 rounded-[2rem] p-5 border-4 border-white shadow-sm h-full flex flex-col justify-center">
-                    <div className="text-center text-sky-800 mb-3 md:mb-4 text-lg md:text-xl">選一個喜歡的角色吧！</div>
+                    <div className="text-center text-sky-800 mb-2 md:mb-3 text-lg md:text-xl">你的專屬角色與名字！</div>
+                    
+                    {/* 🌟 新增：名字輸入框 */}
+                    <div className="mb-4 w-full max-w-[200px] mx-auto">
+                      <input 
+                        type="text" 
+                        value={setupName} 
+                        onChange={e => setSetupName(e.target.value.substring(0, 6))} 
+                        placeholder="輸入你的名字"
+                        className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors"
+                      />
+                    </div>
+
                     <div className="flex flex-wrap justify-center gap-2 md:gap-3 max-h-36 overflow-y-auto p-2 custom-scrollbar">
                       {CHILD_AVATARS.map(avatar => (
                         <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-12 h-12 md:w-16 md:h-16 rounded-full text-3xl md:text-4xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}>
