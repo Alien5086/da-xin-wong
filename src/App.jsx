@@ -885,12 +885,12 @@ export default function App() {
     return (
       <div className="min-h-[100dvh] w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-4 md:p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
         
-        {/* 開頭選單專屬的音樂開關按鈕 (右上角) */}
+        {/* 開頭選單專屬的音樂開關按鈕 (右上角) - 放大版 */}
         <button 
           onClick={() => setIsMuted(!isMuted)} 
-          className={`absolute top-4 right-4 md:top-8 md:right-8 z-[100] w-14 h-14 md:w-16 md:h-16 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 ${isMuted ? 'bg-slate-300 text-slate-600 border-white' : 'bg-white/90 text-amber-500 hover:scale-110 active:scale-95 border-amber-100'}`}
+          className={`absolute top-4 right-4 md:top-8 md:right-8 z-[100] w-16 h-16 md:w-20 md:h-20 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-[5px] ${isMuted ? 'bg-slate-300 text-slate-600 border-white' : 'bg-white/90 text-amber-500 hover:scale-110 active:scale-95 border-amber-100'}`}
         >
-          {isMuted ? <VolumeX size={32} strokeWidth={3}/> : <Volume2 size={32} strokeWidth={3}/>}
+          {isMuted ? <VolumeX size={44} strokeWidth={3}/> : <Volume2 size={44} strokeWidth={3}/>}
         </button>
 
         <style>{`
@@ -1192,26 +1192,26 @@ export default function App() {
       <div className="absolute right-4 bottom-24 md:right-6 md:bottom-8 flex flex-col items-center z-[150] pointer-events-auto">
         <div className={`flex flex-col items-center gap-3 overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-[600px] opacity-100 pb-3' : 'max-h-0 opacity-0 pb-0 pointer-events-none'}`}>
           <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
           </button>
           <button onClick={focusOnCurrentPlayer} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
-            <Target size={32} strokeWidth={3}/>
+            <Target size={38} strokeWidth={3}/>
           </button>
           <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.4))} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
           </button>
           <button onClick={() => setIsFullMapMode(!isFullMapMode)} className={`w-16 h-16 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 shrink-0 ${isFullMapMode ? 'bg-sky-400 text-white border-white scale-110' : 'bg-white/90 text-sky-500 hover:scale-110 active:scale-95 border-sky-100'}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
           </button>
           
           <div className="w-8 h-1.5 bg-sky-200/50 mx-auto my-0.5 rounded-full shrink-0"></div>
 
           <button onClick={() => setIsMuted(!isMuted)} className={`w-16 h-16 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 shrink-0 ${isMuted ? 'bg-slate-300 text-slate-600 border-white' : 'bg-white/90 text-amber-500 hover:scale-110 active:scale-95 border-amber-100'}`}>
-            {isMuted ? <VolumeX size={32} strokeWidth={3}/> : <Volume2 size={32} strokeWidth={3}/>}
+            {isMuted ? <VolumeX size={42} strokeWidth={3}/> : <Volume2 size={42} strokeWidth={3}/>}
           </button>
 
           <button onClick={() => setShowExitConfirm(true)} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-rose-400 hover:bg-rose-50 hover:scale-110 active:scale-95 transition-all border-4 border-rose-100 shrink-0">
-            <LogOut size={32} strokeWidth={3} className="ml-1"/>
+            <LogOut size={38} strokeWidth={3} className="ml-1"/>
           </button>
         </div>
 
@@ -1219,7 +1219,7 @@ export default function App() {
           onClick={() => setIsMenuOpen(!isMenuOpen)} 
           className={`w-20 h-20 rounded-full shadow-[0_5px_20px_rgba(0,0,0,0.15)] flex items-center justify-center transition-all duration-300 border-[5px] mt-1 z-10 ${isMenuOpen ? 'bg-sky-400 text-white border-white rotate-90 scale-95' : 'bg-white/95 backdrop-blur-md text-sky-500 border-sky-200 hover:scale-105'}`}
         >
-          {isMenuOpen ? <X size={36} strokeWidth={3} /> : <Menu size={36} strokeWidth={3} />}
+          {isMenuOpen ? <X size={44} strokeWidth={3} /> : <Menu size={44} strokeWidth={3} />}
         </button>
       </div>
 
