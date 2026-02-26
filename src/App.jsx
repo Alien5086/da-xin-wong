@@ -219,7 +219,8 @@ export default function App() {
   const [setupAvatar, setSetupAvatar] = useState(CHILD_AVATARS[0]);
   
   const [setupName, setSetupName] = useState('玩家 1');
-  const [localNames, setLocalNames] = useState(['玩家 1', '玩家 2', '玩家 3', '玩家 4', '玩家 5', '玩家 6']);
+  const [localNames, setLocalNames] = useState(['玩家 1', '電腦 1', '電腦 2', '電腦 3', '電腦 4', '電腦 5']);
+  const [localPlayerTypes, setLocalPlayerTypes] = useState(['HUMAN', 'AI', 'AI', 'AI', 'AI', 'AI']);
 
   const [localAvatars, setLocalAvatars] = useState([CHILD_AVATARS[0], CHILD_AVATARS[1], CHILD_AVATARS[2], CHILD_AVATARS[3], CHILD_AVATARS[4], CHILD_AVATARS[5]]);
   const [editingLocalPlayer, setEditingLocalPlayer] = useState(0);
@@ -445,7 +446,8 @@ export default function App() {
       color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
       pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
       inJail: false, jailRoundsLeft: 0, isBankrupt: false,
-      uid: `local_player_${i}`
+      uid: `local_player_${i}`,
+      isAI: localPlayerTypes[i] === 'AI'
     }));
     
     setGameData({
@@ -880,6 +882,59 @@ export default function App() {
     } catch(e) { console.error("End turn error", e); }
   };
 
+  // 🤖 電腦玩家 (AI) 自動執行邏輯
+  useEffect(() => {
+    if (appPhase !== 'GAME' || !isOfflineMode) return;
+    const currentPlayer = gameData.players[gameData.currentPlayerIdx];
+    if (!currentPlayer || !currentPlayer.isAI) return;
+
+    let timeoutId;
+    const { gameState } = gameData;
+
+    if (currentPlayer.isBankrupt && gameState !== 'END_TURN') {
+        return; // 破產者跳過，但如果是 END_TURN 狀態則需處理以換人
+    }
+
+    if (gameState === 'IDLE') {
+      timeoutId = setTimeout(() => {
+         if (currentPlayer.jailRoundsLeft === -1) {
+           syncGameData({ gameState: 'JAIL_BWA_BWEI', bwaBweiResults: [] });
+         } else {
+           handleRollDice();
+         }
+      }, 1200);
+    } else if (gameState === 'JAIL_BWA_BWEI') {
+      timeoutId = setTimeout(() => {
+         if ((gameData.bwaBweiResults || []).length < 3) {
+           handleThrowBwaBwei();
+         } else {
+           handleFinishBwaBwei();
+         }
+      }, 1200);
+    } else if (gameState === 'ACTION') {
+      timeoutId = setTimeout(() => {
+         const sq = BOARD_SQUARES[currentPlayer.pos];
+         const pMoney = Number(currentPlayer.money || 0);
+         const pTrust = Number(currentPlayer.trust || 0);
+         const reqMoney = Number(sq.price || 0);
+         const reqTrust = Number(sq.reqTrust || 0);
+         const canBuy = sq.type === 'PROPERTY' && !gameData.properties[sq.id] && pMoney >= reqMoney && pTrust >= reqTrust;
+
+         if (canBuy && Math.random() > 0.2) { // 電腦有 80% 的機率會購買地產
+           handleBuyProperty();
+         } else {
+           handleEndTurn();
+         }
+      }, 2000); // 讓人類玩家有時間閱讀動作訊息
+    } else if (gameState === 'END_TURN') {
+      timeoutId = setTimeout(() => {
+         handleEndTurn();
+      }, 2000);
+    }
+
+    return () => clearTimeout(timeoutId);
+  }, [gameData.gameState, gameData.currentPlayerIdx, gameData.bwaBweiResults, isOfflineMode, appPhase]);
+
 
   if (appPhase === 'LANDING') {
     return (
@@ -979,6 +1034,19 @@ export default function App() {
                             <span className="text-[10px] md:text-xs text-sky-600 bg-white px-2 py-0.5 rounded-full border-2 border-sky-100 max-w-[60px] truncate">{localNames[i]}</span>
                           </div>
                         ))}
+                      </div>
+
+                      <div className="flex justify-center mt-2 mb-3">
+                        <button 
+                          onClick={() => {
+                            const newTypes = [...localPlayerTypes];
+                            newTypes[editingLocalPlayer] = newTypes[editingLocalPlayer] === 'HUMAN' ? 'AI' : 'HUMAN';
+                            setLocalPlayerTypes(newTypes);
+                          }}
+                          className={`px-4 py-1.5 rounded-full border-[3px] text-sm md:text-base font-black transition-all shadow-sm flex items-center gap-1 ${localPlayerTypes[editingLocalPlayer] === 'AI' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-emerald-100 border-emerald-300 text-emerald-700'}`}
+                        >
+                          {localPlayerTypes[editingLocalPlayer] === 'AI' ? '🤖 電腦控制' : '🧑 玩家控制'}
+                        </button>
                       </div>
 
                       <div className="mb-3 w-full max-w-[200px] mx-auto">
@@ -1171,6 +1239,7 @@ export default function App() {
             <div className={`w-[52px] h-[52px] rounded-full flex items-center justify-center text-4xl shadow-sm bg-white border-4 border-slate-100 relative`}>
               {p.icon}
               {p.inJail && !p.isBankrupt && <div className="absolute -top-2 -right-2 text-base animate-bounce drop-shadow-md">🙏</div>}
+              {p.isAI && <div className="absolute -bottom-1 -right-1 text-xs bg-indigo-500 text-white rounded-full w-5 h-5 flex items-center justify-center border-2 border-white shadow-sm">🤖</div>}
             </div>
             <div className="flex flex-col justify-center min-w-[85px]">
               <div className="text-[14px] text-slate-500 flex justify-between items-center leading-none mb-1.5">
@@ -1374,17 +1443,25 @@ export default function App() {
       )}
 
       {gameData.currentPlayerIdx === activePlayerIndex && !myPlayer?.isBankrupt && ['JAIL_BWA_BWEI', 'ACTION', 'END_TURN'].includes(gameData.gameState) && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[250] bg-white/95 backdrop-blur-md p-10 rounded-[3rem] shadow-[0_25px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 min-w-[380px] max-w-[95vw] text-center animate-in slide-in-from-bottom-8 duration-300 pointer-events-auto flex flex-col items-center gap-6">
+        <div className="fixed bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 z-[250] bg-white/95 backdrop-blur-md p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-[0_25px_50px_rgba(0,0,0,0.1)] border-[6px] md:border-[8px] border-sky-100 w-[92vw] md:min-w-[380px] max-w-md max-h-[75vh] overflow-y-auto custom-scrollbar text-center animate-in slide-in-from-bottom-8 duration-300 pointer-events-auto flex flex-col items-center gap-4 md:gap-6 relative">
           
+          {myPlayer?.isAI && (
+            <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-[300] flex items-center justify-center rounded-[1.5rem] md:rounded-[2.5rem]">
+               <div className="bg-indigo-500 text-white px-5 py-2 md:px-6 md:py-3 rounded-full font-black text-xl md:text-2xl animate-pulse shadow-lg flex items-center gap-2">
+                  🤖 電腦思考中...
+               </div>
+            </div>
+          )}
+
           {gameData.gameState === 'JAIL_BWA_BWEI' && (
-            <div className="flex flex-col items-center w-full px-2">
-              <div className="text-3xl font-black text-rose-500 drop-shadow-sm mb-6 bg-rose-50 px-6 py-2 rounded-full border-4 border-white shadow-sm">🚨 反省泡泡時間</div>
+            <div className="flex flex-col items-center w-full px-1 md:px-2">
+              <div className="text-2xl md:text-3xl font-black text-rose-500 drop-shadow-sm mb-4 md:mb-6 bg-rose-50 px-5 md:px-6 py-2 rounded-full border-4 border-white shadow-sm">🚨 反省泡泡時間</div>
               
-              <div className="flex gap-5 justify-center mb-6">
+              <div className="flex gap-3 md:gap-5 justify-center mb-4 md:mb-6">
                 {[0, 1, 2].map(i => {
                   const res = gameData.bwaBweiResults?.[i];
                   if (!res) return (
-                    <div key={i} className="w-[90px] h-[110px] border-[6px] border-dashed border-slate-200 rounded-[2rem] flex items-center justify-center text-slate-200 font-black text-4xl">?</div>
+                    <div key={i} className="w-[75px] h-[95px] md:w-[90px] md:h-[110px] border-[4px] md:border-[6px] border-dashed border-slate-200 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center text-slate-200 font-black text-3xl md:text-4xl">?</div>
                   );
                   
                   const config = {
@@ -1395,39 +1472,39 @@ export default function App() {
                   const c = config[res];
 
                   return (
-                    <div key={i} className={`w-[90px] h-[110px] rounded-[2rem] flex flex-col items-center justify-center border-4 animate-in zoom-in spin-in-12 ${c.color} transition-all`}>
-                      <div className="flex items-center justify-center gap-2 mb-2">
+                    <div key={i} className={`w-[75px] h-[95px] md:w-[90px] md:h-[110px] rounded-[1.5rem] md:rounded-[2rem] flex flex-col items-center justify-center border-[4px] animate-in zoom-in spin-in-12 ${c.color} transition-all`}>
+                      <div className="flex items-center justify-center gap-1 md:gap-2 mb-1 md:mb-2">
                          {res === 'HOLY' && (
                            <>
-                             <BweiBlock isFlat={true} className="rotate-[15deg] scale-75" />
-                             <BweiBlock isFlat={false} className="-rotate-[15deg] scale-x-[-1] scale-75" />
+                             <BweiBlock isFlat={true} className="rotate-[15deg] scale-[0.6] md:scale-75" />
+                             <BweiBlock isFlat={false} className="-rotate-[15deg] scale-x-[-1] scale-[0.6] md:scale-75" />
                            </>
                          )}
                          {res === 'LAUGH' && (
                            <>
-                             <BweiBlock isFlat={true} className="rotate-[15deg] scale-75" />
-                             <BweiBlock isFlat={true} className="-rotate-[15deg] scale-x-[-1] scale-75" />
+                             <BweiBlock isFlat={true} className="rotate-[15deg] scale-[0.6] md:scale-75" />
+                             <BweiBlock isFlat={true} className="-rotate-[15deg] scale-x-[-1] scale-[0.6] md:scale-75" />
                            </>
                          )}
                          {res === 'YIN' && (
                            <>
-                             <BweiBlock isFlat={false} className="rotate-[15deg] scale-75" />
-                             <BweiBlock isFlat={false} className="-rotate-[15deg] scale-x-[-1] scale-75" />
+                             <BweiBlock isFlat={false} className="rotate-[15deg] scale-[0.6] md:scale-75" />
+                             <BweiBlock isFlat={false} className="-rotate-[15deg] scale-x-[-1] scale-[0.6] md:scale-75" />
                            </>
                          )}
                       </div>
-                      <span className={`font-black text-lg mb-1 leading-none ${c.text}`}>{c.label}</span>
+                      <span className={`font-black text-base md:text-lg mb-1 leading-none ${c.text}`}>{c.label}</span>
                     </div>
                   );
                 })}
               </div>
 
               {(gameData.bwaBweiResults || []).length < 3 ? (
-                <button onClick={handleThrowBwaBwei} className="w-full bg-rose-400 hover:bg-rose-300 text-white font-black py-5 px-6 rounded-[2rem] active:translate-y-[6px] active:shadow-none active:border-b-0 transition-all shadow-[0_6px_0_0_#e11d48] text-2xl border-[4px] border-white flex justify-center items-center gap-2 mt-3">
+                <button onClick={handleThrowBwaBwei} className="w-full bg-rose-400 hover:bg-rose-300 text-white font-black py-3 md:py-4 px-6 rounded-[1.5rem] md:rounded-[2rem] active:translate-y-[6px] active:shadow-none active:border-b-0 transition-all shadow-[0_6px_0_0_#e11d48] text-xl md:text-2xl border-[4px] border-white flex justify-center items-center gap-2 mt-2">
                   🙏 進行第 {(gameData.bwaBweiResults || []).length + 1} 次擲杯
                 </button>
               ) : (
-                <button onClick={handleFinishBwaBwei} className="w-full bg-emerald-400 hover:bg-emerald-300 text-white font-black py-5 px-6 rounded-[2rem] active:translate-y-[6px] active:shadow-none active:border-b-0 transition-all shadow-[0_6px_0_0_#10b981] text-2xl border-[4px] border-white flex justify-center items-center gap-2 mt-3 animate-bounce">
+                <button onClick={handleFinishBwaBwei} className="w-full bg-emerald-400 hover:bg-emerald-300 text-white font-black py-3 md:py-4 px-6 rounded-[1.5rem] md:rounded-[2rem] active:translate-y-[6px] active:shadow-none active:border-b-0 transition-all shadow-[0_6px_0_0_#10b981] text-xl md:text-2xl border-[4px] border-white flex justify-center items-center gap-2 mt-2 animate-bounce">
                   ✨ 查看神明旨意
                 </button>
               )}
@@ -1435,22 +1512,22 @@ export default function App() {
           )}
 
           {gameData.gameState !== 'JAIL_BWA_BWEI' && gameData.actionMessage && (
-            <div className="font-black text-slate-700 text-[1.6rem] leading-relaxed whitespace-pre-line px-4 text-center">
+            <div className="font-black text-slate-700 text-xl md:text-2xl leading-relaxed whitespace-pre-line px-2 md:px-4 text-center">
               {gameData.actionMessage}
             </div>
           )}
 
-          <div className="flex flex-col gap-4 w-full mt-3">
+          <div className="flex flex-col gap-3 md:gap-4 w-full mt-2 md:mt-3">
             {gameData.gameState === 'ACTION' && currentSquare?.type === 'PROPERTY' && !gameData.properties[myPlayer.pos] && (
               <button 
                 onClick={canBuy ? handleBuyProperty : undefined} 
                 disabled={!canBuy}
-                className={`font-black py-5 px-8 w-full rounded-[2rem] transition-all text-3xl border-[4px] border-white flex flex-col items-center justify-center ${canBuy ? 'bg-sky-400 hover:bg-sky-300 text-white shadow-[0_6px_0_0_#0ea5e9] active:translate-y-[6px] active:shadow-none cursor-pointer' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}
+                className={`font-black py-3 md:py-4 px-6 w-full rounded-[1.5rem] md:rounded-[2rem] transition-all text-xl md:text-2xl border-[4px] border-white flex flex-col items-center justify-center ${canBuy ? 'bg-sky-400 hover:bg-sky-300 text-white shadow-[0_6px_0_0_#0ea5e9] active:translate-y-[6px] active:shadow-none cursor-pointer' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}
               >
                 {!canBuy ? (
                   <>
-                    <span className="text-2xl">😢 沒辦法買耶</span>
-                    <span className="text-base font-bold text-rose-400 mt-1">
+                    <span className="text-xl md:text-2xl">😢 沒辦法買耶</span>
+                    <span className="text-sm md:text-base font-bold text-rose-400 mt-1">
                       {myMoney < reqMoney ? `錢錢還差 $${reqMoney - myMoney}` : `信用還差 ${reqTrust - myTrust} 點喔`}
                     </span>
                   </>
@@ -1461,7 +1538,7 @@ export default function App() {
             )}
             
             {(gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && (
-              <button onClick={handleEndTurn} className="bg-amber-400 w-full hover:bg-amber-300 text-amber-900 font-black py-5 px-6 rounded-[2rem] active:translate-y-[6px] active:shadow-none transition-all shadow-[0_6px_0_0_#d97706] text-3xl border-[4px] border-white">
+              <button onClick={handleEndTurn} className="bg-amber-400 w-full hover:bg-amber-300 text-amber-900 font-black py-3 md:py-4 px-6 rounded-[1.5rem] md:rounded-[2rem] active:translate-y-[6px] active:shadow-none transition-all shadow-[0_6px_0_0_#d97706] text-xl md:text-2xl border-[4px] border-white">
                 ✅ 換下一位囉！
               </button>
             )}
@@ -1595,7 +1672,7 @@ export default function App() {
 
                           <div 
                             onClick={(e) => {
-                               if (p.id === activePlayerIndex) {
+                               if (p.id === activePlayerIndex && !p.isAI) {
                                    e.stopPropagation();
                                    setShowAssetManager(true);
                                }
@@ -1605,14 +1682,15 @@ export default function App() {
                                 ? 'border-amber-400 scale-125 z-40 relative' 
                                 : 'border-slate-200 scale-[0.65] grayscale opacity-70 z-10' 
                             } ${
-                              p.id === activePlayerIndex 
+                              p.id === activePlayerIndex && !p.isAI
                                 ? 'cursor-pointer hover:ring-[6px] hover:ring-sky-300 hover:scale-[1.4] hover:grayscale-0 hover:opacity-100' 
                                 : ''
                             }`}
                           >
                             {p.icon}
+                            {p.isAI && <div className="absolute -top-1 -right-1 text-sm bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center border-2 border-white shadow-md z-50">🤖</div>}
 
-                            {p.id === activePlayerIndex && !p.isBankrupt && (
+                            {p.id === activePlayerIndex && !p.isBankrupt && !p.isAI && (
                               <div className="absolute -bottom-2 -right-2 bg-amber-400 text-amber-900 p-1.5 rounded-full shadow-md border-4 border-white z-50 animate-bounce">
                                  <Briefcase size={18} strokeWidth={3}/>
                               </div>
@@ -1629,7 +1707,11 @@ export default function App() {
                                   </div>
                                 )}
                                 
-                                {myPlayer?.jailRoundsLeft === -1 ? (
+                                {p.isAI ? (
+                                    <div className="whitespace-nowrap px-6 py-3 bg-indigo-500 text-white rounded-[2rem] font-black text-2xl shadow-lg border-[4px] border-white animate-pulse">
+                                      🤖 電腦思考中...
+                                    </div>
+                                ) : myPlayer?.jailRoundsLeft === -1 ? (
                                   <button onClick={() => syncGameData({ gameState: 'JAIL_BWA_BWEI', bwaBweiResults: [] })} className="whitespace-nowrap px-8 py-4 bg-rose-400 hover:bg-rose-300 text-white rounded-[2rem] font-black text-3xl shadow-[0_8px_0_0_#e11d48,0_10px_20px_rgba(0,0,0,0.1)] active:shadow-none active:translate-y-[8px] active:border-b-0 transition-all flex items-center gap-3 border-[4px] border-white">
                                     🙏 開始擲杯！
                                   </button>
