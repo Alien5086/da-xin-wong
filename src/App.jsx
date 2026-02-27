@@ -34,7 +34,7 @@ const BAD_CARDS = [
   { desc: '做壞事進反省泡泡', effectM: 0, effectT: 0, goToJail: true }
 ];
 
-// 🎨 地產設定：已根據要求設定精確信用門檻
+// 🎨 地產設定
 const BOARD_SQUARES = [
   { id: 0, name: '起點', type: 'START', desc: '經過得$500' },
   { id: 1, name: '冰店', type: 'PROPERTY', price: 400, reqTrust: 0, color: 'bg-sky-300' },
@@ -78,14 +78,12 @@ const BOARD_SQUARES = [
   { id: 39, name: '自來水廠', type: 'PROPERTY', price: 2000, reqTrust: 15, color: 'bg-slate-300' },
 ];
 
-const GRID_ORDER = (() => {
-  const order = new Array(40).fill(null);
-  for (let i = 0; i <= 10; i++) order[i] = { row: 11, col: 11 - i };
-  for (let i = 11; i <= 19; i++) order[i] = { row: 11 - (i - 10), col: 1 };
-  for (let i = 20; i <= 30; i++) order[i] = { row: 1, col: 1 + (i - 20) };
-  for (let i = 31; i <= 39; i++) order[i] = { row: 1 + (i - 30), col: 11 };
-  return order;
-})();
+const GRID_ORDER = [];
+for (let i = 0; i < 40; i++) { GRID_ORDER.push(null); }
+for (let i = 0; i <= 10; i++) { GRID_ORDER[i] = { row: 11, col: 11 - i }; }
+for (let i = 11; i <= 19; i++) { GRID_ORDER[i] = { row: 11 - (i - 10), col: 1 }; }
+for (let i = 20; i <= 30; i++) { GRID_ORDER[i] = { row: 1, col: 1 + (i - 20) }; }
+for (let i = 31; i <= 39; i++) { GRID_ORDER[i] = { row: 1 + (i - 30), col: 11 }; }
 
 const CHILD_AVATARS = ['👦', '👧', '👶', '👼', '👲', '👸', '🤴', '🤓', '🤠', '😎', '👻', '👽', '🤖', '👾', '測試', '🐼'];
 
@@ -99,21 +97,32 @@ const formatTime = (seconds) => {
 const checkBankruptcy = (players) => {
   let changed = false;
   const newPlayers = [];
-  for (const p of players) {
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i];
     if (!p.isBankrupt && (p.money < 0 || p.trust <= 0)) {
       changed = true;
-      newPlayers.push({ ...p, isBankrupt: true });
+      const bp = {};
+      for (const k in p) { bp[k] = p[k]; }
+      bp.isBankrupt = true;
+      newPlayers.push(bp);
     } else {
       newPlayers.push(p);
     }
   }
-  return { changed, newPlayers };
+  return { changed: changed, newPlayers: newPlayers };
 };
 
 const clearBankruptProperties = (props, bankruptPlayerIds) => {
   const newProps = {};
   for (const sqId in props) {
-    if (!bankruptPlayerIds.includes(props[sqId])) {
+    let found = false;
+    for (let i = 0; i < bankruptPlayerIds.length; i++) {
+      if (bankruptPlayerIds[i] === props[sqId]) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
       newProps[sqId] = props[sqId];
     }
   }
@@ -309,7 +318,7 @@ export default function App() {
   const inverseZoom = 1 / displayZoom; 
   const canBuy = Boolean(currentSquare && myMoney >= reqMoney && myTrust >= reqTrust);
   
-  let myProperties = [];
+  const myProperties = [];
   if (myPlayer && gameData.properties) {
       for (const sqId in gameData.properties) {
           if (gameData.properties[sqId] === activePlayerIndex) {
@@ -328,7 +337,12 @@ export default function App() {
   // --- 邏輯函數 ---
   const syncGameData = useCallback(async (updates) => {
     if (isOfflineMode) {
-        setGameData(prev => ({ ...prev, ...updates }));
+        setGameData(prev => {
+            const nextState = {};
+            for (const key in prev) { nextState[key] = prev[key]; }
+            for (const key in updates) { nextState[key] = updates[key]; }
+            return nextState;
+        });
     } else {
         if (!auth.currentUser) return;
         try {
@@ -516,7 +530,17 @@ export default function App() {
     }
     
     setGameData({
-      players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: 'LOCAL', timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0, diceVals: [1, 1], bwaBweiResults: [], pendingTrade: null
+      players: players, 
+      currentPlayerIdx: 0, 
+      gameState: 'IDLE', 
+      roomId: 'LOCAL', 
+      timeLeft: setupTimeLimit, 
+      properties: {}, 
+      actionMessage: '', 
+      remainingSteps: 0, 
+      diceVals: [1, 1], 
+      bwaBweiResults: [], 
+      pendingTrade: null
     });
     setRoomId('單機同樂');
     setAppPhase('GAME'); 
@@ -545,7 +569,17 @@ export default function App() {
     
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
-        players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0, diceVals: [1, 1], bwaBweiResults: [], pendingTrade: null
+        players: players, 
+        currentPlayerIdx: 0, 
+        gameState: 'IDLE', 
+        roomId: id, 
+        timeLeft: setupTimeLimit, 
+        properties: {}, 
+        actionMessage: '', 
+        remainingSteps: 0, 
+        diceVals: [1, 1], 
+        bwaBweiResults: [], 
+        pendingTrade: null
       });
       setRoomId(id); setIsHost(true); setMyPlayerIndex(0); setAppPhase('GAME'); setLocalTimeLeft(setupTimeLimit);
     } catch (e) { setErrorMsg("建立失敗，請確認 Firebase 設定。"); }
@@ -647,8 +681,16 @@ export default function App() {
             msg = '✨ 經過起點，領取 $500 零用錢！\n';
           }
           
-          const newPlayers = [...gameData.players];
-          newPlayers[activePlayerIndex] = { ...player, pos: newPos, money: newMoney };
+          const newPlayers = [];
+          for (let i = 0; i < gameData.players.length; i++) {
+              newPlayers.push(gameData.players[i]);
+          }
+
+          const pCopy = {};
+          for (const k in player) { pCopy[k] = player[k]; }
+          pCopy.pos = newPos;
+          pCopy.money = newMoney;
+          newPlayers[activePlayerIndex] = pCopy;
 
           await syncGameData({
             players: newPlayers,
@@ -671,7 +713,11 @@ export default function App() {
     const sq = BOARD_SQUARES[player.pos];
     let nextState = 'ACTION';
     let msg = gameData.actionMessage || '';
-    const newPlayers = [...gameData.players];
+    
+    const newPlayers = [];
+    for (let i = 0; i < gameData.players.length; i++) {
+        newPlayers.push(gameData.players[i]);
+    }
 
     if (sq.type === 'START') {
       playSound('coin', isMuted); 
@@ -710,7 +756,7 @@ export default function App() {
       msg += `好好的懺悔反省 🙏\n請誠心擲杯問神明。`;
       nextState = 'JAIL_BWA_BWEI'; 
     } else if (sq.type === 'PROPERTY') {
-      const ownerId = gameData.properties?.[sq.id];
+      const ownerId = gameData.properties ? gameData.properties[sq.id] : undefined;
       if (ownerId !== undefined && ownerId !== activePlayerIndex) {
         const owner = newPlayers[ownerId];
         if (!owner.inJail && !owner.isBankrupt) { 
@@ -751,7 +797,7 @@ export default function App() {
 
     let updatedProperties = gameData.properties;
     if (bankruptCheck.changed) {
-        let bankruptIds = [];
+        const bankruptIds = [];
         for (let i = 0; i < bankruptCheck.newPlayers.length; i++) {
             if (bankruptCheck.newPlayers[i].isBankrupt) {
                 bankruptIds.push(bankruptCheck.newPlayers[i].id);
@@ -785,7 +831,13 @@ export default function App() {
         else if (rand < 0.75) res = 'LAUGH'; 
         else res = 'YIN'; 
 
-        const newResults = [...(gameData.bwaBweiResults || []), res];
+        const newResults = [];
+        if (gameData.bwaBweiResults) {
+            for (let i = 0; i < gameData.bwaBweiResults.length; i++) {
+                newResults.push(gameData.bwaBweiResults[i]);
+            }
+        }
+        newResults.push(res);
         
         await syncGameData({ 
           gameState: 'JAIL_BWA_BWEI',
@@ -797,7 +849,10 @@ export default function App() {
   }, [gameData.gameState, gameData.currentPlayerIdx, activePlayerIndex, gameData.bwaBweiResults, isOfflineMode, roomId, syncGameData]);
 
   const handleFinishBwaBwei = async () => {
-    const newPlayers = [...gameData.players];
+    const newPlayers = [];
+    for (let i = 0; i < gameData.players.length; i++) {
+        newPlayers.push(gameData.players[i]);
+    }
     
     let holyCount = 0;
     const results = gameData.bwaBweiResults || [];
@@ -837,11 +892,15 @@ export default function App() {
       
       if (pMoney >= reqMoney && pTrust >= reqTrust) {
         playSound('coin', isMuted); 
-        const newPlayers = [...gameData.players];
+        const newPlayers = [];
+        for (let i = 0; i < gameData.players.length; i++) {
+            newPlayers.push(gameData.players[i]);
+        }
         newPlayers[activePlayerIndex].money -= reqMoney;
 
         const currentProps = gameData.properties || {};
-        const newProps = { ...currentProps };
+        const newProps = {};
+        for (const k in currentProps) { newProps[k] = currentProps[k]; }
         newProps[sq.id] = player.id;
 
         await syncGameData({
@@ -858,7 +917,10 @@ export default function App() {
 
   const handleSellToBank = useCallback(async (sqId, price) => {
     playSound('coin', isMuted); 
-    const newPlayers = [...gameData.players];
+    const newPlayers = [];
+    for (let i = 0; i < gameData.players.length; i++) {
+        newPlayers.push(gameData.players[i]);
+    }
     newPlayers[activePlayerIndex].money += price;
     
     const newProps = {};
@@ -874,7 +936,7 @@ export default function App() {
 
   const initiatePlayerTrade = useCallback(async (sqId, price, buyerIdx) => {
     playSound('click', isMuted);
-    await syncGameData({ pendingTrade: { sellerIdx: activePlayerIndex, buyerIdx, sqId, price } });
+    await syncGameData({ pendingTrade: { sellerIdx: activePlayerIndex, buyerIdx: buyerIdx, sqId: sqId, price: price } });
     setSellProcess(null);
     setShowAssetManager(false);
   }, [activePlayerIndex, isMuted, syncGameData]);
@@ -884,10 +946,14 @@ export default function App() {
     const trade = gameData.pendingTrade;
     if (accept) {
         playSound('coin', isMuted);
-        const newPlayers = [...gameData.players];
+        const newPlayers = [];
+        for (let i = 0; i < gameData.players.length; i++) {
+            newPlayers.push(gameData.players[i]);
+        }
         newPlayers[trade.sellerIdx].money += trade.price;
         newPlayers[trade.buyerIdx].money -= trade.price;
-        const newProps = { ...gameData.properties };
+        const newProps = {};
+        for (const k in gameData.properties) { newProps[k] = gameData.properties[k]; }
         newProps[trade.sqId] = trade.buyerIdx;
         await syncGameData({ players: newPlayers, properties: newProps, pendingTrade: null });
     } else {
@@ -906,7 +972,10 @@ export default function App() {
          const isHighTrust = player.trust >= 10;
          const exchangeRate = isHighTrust ? 1000 : 500;
 
-         const newPlayers = [...gameData.players];
+         const newPlayers = [];
+         for (let i = 0; i < gameData.players.length; i++) {
+             newPlayers.push(gameData.players[i]);
+         }
          newPlayers[activePlayerIndex].trust -= 1;
          newPlayers[activePlayerIndex].money += exchangeRate;
 
@@ -919,7 +988,10 @@ export default function App() {
   const handleEndTurn = async () => {
     try {
       playSound('click', isMuted); 
-      let newPlayers = [...gameData.players];
+      const newPlayers = [];
+      for (let i = 0; i < gameData.players.length; i++) {
+          newPlayers.push(gameData.players[i]);
+      }
       let nextIdx = gameData.currentPlayerIdx;
       
       let attempts = 0;
@@ -969,7 +1041,7 @@ export default function App() {
 
       let updatedProperties = gameData.properties;
       if (bankruptCheck.changed) {
-          let bankruptIds = [];
+          const bankruptIds = [];
           for (let i = 0; i < bankruptCheck.newPlayers.length; i++) {
               if (bankruptCheck.newPlayers[i].isBankrupt) {
                   bankruptIds.push(bankruptCheck.newPlayers[i].id);
@@ -1011,7 +1083,7 @@ export default function App() {
             else if (gameState === 'JAIL_BWA_BWEI') { tId = setTimeout(() => { if ((gameData.bwaBweiResults || []).length < 3) { handleThrowBwaBwei(); } else { handleFinishBwaBwei(); } }, 1200); }
             else if (gameState === 'ACTION') { tId = setTimeout(() => {
                 const sq = BOARD_SQUARES[currAI.pos];
-                const cB = sq.type === 'PROPERTY' && !gameData.properties[sq.id] && currAI.money >= sq.price && currAI.trust >= sq.reqTrust;
+                const cB = sq.type === 'PROPERTY' && (!gameData.properties || gameData.properties[sq.id] === undefined) && currAI.money >= sq.price && currAI.trust >= sq.reqTrust;
                 if (cB && Math.random() > 0.2) { handleBuyProperty(); } else { handleEndTurn(); }
             }, 2000); }
             else if (gameState === 'END_TURN') { tId = setTimeout(() => { handleEndTurn(); }, 2000); }
@@ -1100,7 +1172,7 @@ export default function App() {
                     <div className="w-full bg-sky-50 rounded-[2rem] p-4 md:p-5 border-4 border-white shadow-sm h-full flex flex-col">
                       <div className="text-center text-sky-800 mb-2 md:mb-3 text-base md:text-lg">幫角色取名字＆換頭像吧！👇</div>
                       <div className="flex flex-wrap justify-center gap-2 md:gap-3 mb-3 md:mb-4">
-                        {Array.from({ length: setupPlayerCount }).map((_, i) => (
+                        {[0, 1, 2, 3, 4, 5].slice(0, setupPlayerCount).map((i) => (
                           <div key={i} className="flex flex-col items-center gap-1 md:gap-2">
                             <button 
                               onClick={() => setEditingLocalPlayer(i)}
@@ -1116,7 +1188,8 @@ export default function App() {
                       <div className="flex justify-center mt-2 mb-3">
                         <button 
                           onClick={() => {
-                            const newTypes = [...localPlayerTypes];
+                            const newTypes = [];
+                            for(let j=0; j<localPlayerTypes.length; j++) { newTypes.push(localPlayerTypes[j]); }
                             newTypes[editingLocalPlayer] = newTypes[editingLocalPlayer] === 'HUMAN' ? 'AI' : 'HUMAN';
                             setLocalPlayerTypes(newTypes);
                           }}
@@ -1131,7 +1204,8 @@ export default function App() {
                           type="text" 
                           value={localNames[editingLocalPlayer]} 
                           onChange={e => {
-                            const newNames = [...localNames];
+                            const newNames = [];
+                            for(let j=0; j<localNames.length; j++) { newNames.push(localNames[j]); }
                             newNames[editingLocalPlayer] = e.target.value.substring(0, 6);
                             setLocalNames(newNames);
                           }} 
@@ -1147,7 +1221,8 @@ export default function App() {
                             <button 
                               key={avatar} 
                               onClick={() => {
-                                const newAvatars = [...localAvatars];
+                                const newAvatars = [];
+                                for(let j=0; j<localAvatars.length; j++) { newAvatars.push(localAvatars[j]); }
                                 newAvatars[targetIdx] = avatar;
                                 setLocalAvatars(newAvatars);
                               }} 
@@ -1244,7 +1319,9 @@ export default function App() {
   }
 
   if (gameData.gameState === 'GAME_OVER') {
-     const rankedPlayers = [...gameData.players].sort((a, b) => {
+     const rankedPlayers = [];
+     for (let i = 0; i < gameData.players.length; i++) { rankedPlayers.push(gameData.players[i]); }
+     rankedPlayers.sort((a, b) => {
          if (b.trust !== a.trust) return b.trust - a.trust; 
          return b.money - a.money; 
      });
@@ -1422,7 +1499,7 @@ export default function App() {
                    )}
                    {gameData.gameState !== 'JAIL_BWA_BWEI' && <div className="text-3xl leading-relaxed whitespace-pre-line px-4 text-slate-700 font-black">{gameData.actionMessage}</div>}
                    <div className="flex flex-col gap-4 w-full mt-4 font-black">
-                     {gameData.gameState==='ACTION' && currentSquare?.type==='PROPERTY' && myPlayer && gameData.properties[myPlayer.pos] === undefined && (
+                     {gameData.gameState==='ACTION' && currentSquare?.type==='PROPERTY' && myPlayer && (!gameData.properties || gameData.properties[myPlayer.pos] === undefined) && (
                        <button onClick={canBuy ? handleBuyProperty : null} disabled={!canBuy} className={`py-5 rounded-[2rem] border-4 border-white shadow-lg font-black text-2xl transition-all active:scale-95 ${canBuy ? 'bg-sky-400 text-white shadow-md' : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'}`}>🎁 買下這裡！({"$"}{currentSquare?.price || 0})</button>
                      )}
                      {(gameData.gameState==='ACTION'||gameData.gameState==='END_TURN') && <button onClick={handleEndTurn} className="py-5 bg-amber-400 text-amber-900 rounded-[2rem] border-4 border-white shadow-lg text-2xl font-black active:translate-y-1 transition-all">✅ 結束回合</button>}
@@ -1440,7 +1517,7 @@ export default function App() {
             
             {(() => {
                const sq = BOARD_SQUARES[selectedSquareInfo];
-               const ownerId = gameData.properties?.[sq.id];
+               const ownerId = gameData.properties ? gameData.properties[sq.id] : undefined;
                let owner = null;
                if (ownerId !== undefined) {
                    for (let i = 0; i < gameData.players.length; i++) {
@@ -1499,7 +1576,7 @@ export default function App() {
                      </div>
                    )}
                  </>
-               )
+               );
             })()}
           </div>
         </div>
@@ -1663,7 +1740,10 @@ export default function App() {
 
               let contentClass = `flex-1 flex flex-col items-center justify-center p-2 relative w-full h-full ${bodyBg} z-10`;
 
-              const isActiveCell = activePlayersHere.some(p => p.id === gameData.currentPlayerIdx);
+              let isActiveCell = false;
+              for (let i = 0; i < activePlayersHere.length; i++) {
+                  if (activePlayersHere[i].id === gameData.currentPlayerIdx) isActiveCell = true;
+              }
               const isMyTurnOnThisCell = isActiveCell && gameData.currentPlayerIdx === activePlayerIndex;
 
               let inactiveCount = 0;
@@ -1780,21 +1860,27 @@ export default function App() {
                               if (myPlayer && myPlayer.inJail) return null;
                               if (isTradeActive) return null;
 
-                              return (
-                                <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 z-[200]">
-                                  <div className="flex flex-col items-center gap-3 animate-in slide-in-from-bottom-4 duration-300" style={{ transform: 'scale(' + inverseZoom + ')', transformOrigin: 'bottom center' }}>
-                                    {myPlayer && myPlayer.isAI ? (
+                              if (myPlayer && myPlayer.isAI) {
+                                  return (
+                                    <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 z-[200]">
+                                      <div className="flex flex-col items-center gap-3 animate-in slide-in-from-bottom-4 duration-300" style={{ transform: 'scale(' + inverseZoom + ')', transformOrigin: 'bottom center' }}>
                                         <div className="whitespace-nowrap px-6 py-3 bg-slate-700 text-white rounded-[2rem] font-black text-xl shadow-lg flex items-center gap-2 animate-pulse border-[3px] border-slate-500">
                                           🤖 思考中...
                                         </div>
-                                    ) : (
+                                      </div>
+                                    </div>
+                                  );
+                              } else {
+                                  return (
+                                    <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 z-[200]">
+                                      <div className="flex flex-col items-center gap-3 animate-in slide-in-from-bottom-4 duration-300" style={{ transform: 'scale(' + inverseZoom + ')', transformOrigin: 'bottom center' }}>
                                         <button onClick={handleRollDice} className="whitespace-nowrap px-8 py-4 bg-sky-400 hover:bg-sky-300 text-white rounded-[2rem] font-black text-3xl shadow-[0_8px_0_0_#0284c7,0_10px_20px_rgba(0,0,0,0.15)] active:shadow-none active:translate-y-[8px] active:border-b-0 transition-all flex items-center gap-3 border-[4px] border-white animate-bounce">
                                           <Dice5 size={32} strokeWidth={3}></Dice5> 擲骰子
                                         </button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
+                                      </div>
+                                    </div>
+                                  );
+                              }
                           })()}
 
                         </div>
