@@ -219,8 +219,7 @@ export default function App() {
   const [setupAvatar, setSetupAvatar] = useState(CHILD_AVATARS[0]);
   
   const [setupName, setSetupName] = useState('玩家 1');
-  const [localNames, setLocalNames] = useState(['玩家 1', '電腦 1', '電腦 2', '電腦 3', '電腦 4', '電腦 5']);
-  const [localPlayerTypes, setLocalPlayerTypes] = useState(['HUMAN', 'AI', 'AI', 'AI', 'AI', 'AI']);
+  const [localNames, setLocalNames] = useState(['玩家 1', '玩家 2', '玩家 3', '玩家 4', '玩家 5', '玩家 6']);
 
   const [localAvatars, setLocalAvatars] = useState([CHILD_AVATARS[0], CHILD_AVATARS[1], CHILD_AVATARS[2], CHILD_AVATARS[3], CHILD_AVATARS[4], CHILD_AVATARS[5]]);
   const [editingLocalPlayer, setEditingLocalPlayer] = useState(0);
@@ -446,8 +445,7 @@ export default function App() {
       color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
       pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
       inJail: false, jailRoundsLeft: 0, isBankrupt: false,
-      uid: `local_player_${i}`,
-      isAI: localPlayerTypes[i] === 'AI'
+      uid: `local_player_${i}`
     }));
     
     setGameData({
@@ -882,59 +880,6 @@ export default function App() {
     } catch(e) { console.error("End turn error", e); }
   };
 
-  // 🤖 電腦玩家 (AI) 自動執行邏輯
-  useEffect(() => {
-    if (appPhase !== 'GAME' || !isOfflineMode) return;
-    const currentPlayer = gameData.players[gameData.currentPlayerIdx];
-    if (!currentPlayer || !currentPlayer.isAI) return;
-
-    let timeoutId;
-    const { gameState } = gameData;
-
-    if (currentPlayer.isBankrupt && gameState !== 'END_TURN') {
-        return; // 破產者跳過，但如果是 END_TURN 狀態則需處理以換人
-    }
-
-    if (gameState === 'IDLE') {
-      timeoutId = setTimeout(() => {
-         if (currentPlayer.jailRoundsLeft === -1) {
-           syncGameData({ gameState: 'JAIL_BWA_BWEI', bwaBweiResults: [] });
-         } else {
-           handleRollDice();
-         }
-      }, 1200);
-    } else if (gameState === 'JAIL_BWA_BWEI') {
-      timeoutId = setTimeout(() => {
-         if ((gameData.bwaBweiResults || []).length < 3) {
-           handleThrowBwaBwei();
-         } else {
-           handleFinishBwaBwei();
-         }
-      }, 1200);
-    } else if (gameState === 'ACTION') {
-      timeoutId = setTimeout(() => {
-         const sq = BOARD_SQUARES[currentPlayer.pos];
-         const pMoney = Number(currentPlayer.money || 0);
-         const pTrust = Number(currentPlayer.trust || 0);
-         const reqMoney = Number(sq.price || 0);
-         const reqTrust = Number(sq.reqTrust || 0);
-         const canBuy = sq.type === 'PROPERTY' && !gameData.properties[sq.id] && pMoney >= reqMoney && pTrust >= reqTrust;
-
-         if (canBuy && Math.random() > 0.2) { // 電腦有 80% 的機率會購買地產
-           handleBuyProperty();
-         } else {
-           handleEndTurn();
-         }
-      }, 2000); // 讓人類玩家有時間閱讀動作訊息
-    } else if (gameState === 'END_TURN') {
-      timeoutId = setTimeout(() => {
-         handleEndTurn();
-      }, 2000);
-    }
-
-    return () => clearTimeout(timeoutId);
-  }, [gameData.gameState, gameData.currentPlayerIdx, gameData.bwaBweiResults, isOfflineMode, appPhase]);
-
 
   if (appPhase === 'LANDING') {
     return (
@@ -1034,19 +979,6 @@ export default function App() {
                             <span className="text-[10px] md:text-xs text-sky-600 bg-white px-2 py-0.5 rounded-full border-2 border-sky-100 max-w-[60px] truncate">{localNames[i]}</span>
                           </div>
                         ))}
-                      </div>
-
-                      <div className="flex justify-center mt-2 mb-3">
-                        <button 
-                          onClick={() => {
-                            const newTypes = [...localPlayerTypes];
-                            newTypes[editingLocalPlayer] = newTypes[editingLocalPlayer] === 'HUMAN' ? 'AI' : 'HUMAN';
-                            setLocalPlayerTypes(newTypes);
-                          }}
-                          className={`px-4 py-1.5 rounded-full border-[3px] text-sm md:text-base font-black transition-all shadow-sm flex items-center gap-1 ${localPlayerTypes[editingLocalPlayer] === 'AI' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-emerald-100 border-emerald-300 text-emerald-700'}`}
-                        >
-                          {localPlayerTypes[editingLocalPlayer] === 'AI' ? '🤖 電腦控制' : '🧑 玩家控制'}
-                        </button>
                       </div>
 
                       <div className="mb-3 w-full max-w-[200px] mx-auto">
@@ -1239,7 +1171,6 @@ export default function App() {
             <div className={`w-[52px] h-[52px] rounded-full flex items-center justify-center text-4xl shadow-sm bg-white border-4 border-slate-100 relative`}>
               {p.icon}
               {p.inJail && !p.isBankrupt && <div className="absolute -top-2 -right-2 text-base animate-bounce drop-shadow-md">🙏</div>}
-              {p.isAI && <div className="absolute -bottom-1 -right-1 text-xs bg-indigo-500 text-white rounded-full w-5 h-5 flex items-center justify-center border-2 border-white shadow-sm">🤖</div>}
             </div>
             <div className="flex flex-col justify-center min-w-[85px]">
               <div className="text-[14px] text-slate-500 flex justify-between items-center leading-none mb-1.5">
@@ -1258,54 +1189,44 @@ export default function App() {
         ))}
       </div>
 
-      <div className="absolute right-4 bottom-24 md:right-6 md:bottom-8 flex flex-col items-end z-[150] pointer-events-auto">
-        <div className={`flex flex-col items-end gap-3 overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-[800px] opacity-100 pb-3' : 'max-h-0 opacity-0 pb-0 pointer-events-none'}`}>
-          
-          <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="h-16 md:h-20 px-5 md:px-6 bg-white/95 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 text-sky-600 hover:scale-105 active:scale-95 transition-all border-[4px] border-sky-100 shrink-0 origin-right">
-            <span className="font-black text-lg md:text-xl whitespace-nowrap">放大畫面</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" className="md:w-[42px] md:h-[42px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+      <div className="absolute right-4 bottom-24 md:right-6 md:bottom-8 flex flex-col items-center z-[150] pointer-events-auto">
+        <div className={`flex flex-col items-center gap-3 overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-[600px] opacity-100 pb-3' : 'max-h-0 opacity-0 pb-0 pointer-events-none'}`}>
+          <button onClick={() => setZoom(z => Math.min(z + 0.1, 1.5))} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button onClick={focusOnCurrentPlayer} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
+            <Target size={38} strokeWidth={3}/>
+          </button>
+          <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.4))} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-sky-500 hover:scale-110 active:scale-95 transition-all border-4 border-sky-100 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button onClick={() => setIsFullMapMode(!isFullMapMode)} className={`w-16 h-16 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 shrink-0 ${isFullMapMode ? 'bg-sky-400 text-white border-white scale-110' : 'bg-white/90 text-sky-500 hover:scale-110 active:scale-95 border-sky-100'}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
           </button>
           
-          <button onClick={focusOnCurrentPlayer} className="h-16 md:h-20 px-5 md:px-6 bg-white/95 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 text-sky-600 hover:scale-105 active:scale-95 transition-all border-[4px] border-sky-100 shrink-0 origin-right">
-            <span className="font-black text-lg md:text-xl whitespace-nowrap">尋找玩家</span>
-            <Target size={36} className="md:w-[42px] md:h-[42px] shrink-0" strokeWidth={3}/>
-          </button>
-          
-          <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.4))} className="h-16 md:h-20 px-5 md:px-6 bg-white/95 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 text-sky-600 hover:scale-105 active:scale-95 transition-all border-[4px] border-sky-100 shrink-0 origin-right">
-            <span className="font-black text-lg md:text-xl whitespace-nowrap">縮小畫面</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" className="md:w-[42px] md:h-[42px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-          </button>
-          
-          <button onClick={() => setIsFullMapMode(!isFullMapMode)} className={`h-16 md:h-20 px-5 md:px-6 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 transition-all border-[4px] shrink-0 origin-right ${isFullMapMode ? 'bg-sky-400 text-white border-white scale-105' : 'bg-white/95 text-sky-600 hover:scale-105 active:scale-95 border-sky-100'}`}>
-            <span className="font-black text-lg md:text-xl whitespace-nowrap">{isFullMapMode ? '跟隨玩家' : '全覽地圖'}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" className="md:w-[42px] md:h-[42px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
-          </button>
-          
-          <div className="w-12 h-1.5 bg-sky-200/50 my-1 rounded-full shrink-0 mr-4 md:mr-7"></div>
+          <div className="w-8 h-1.5 bg-sky-200/50 mx-auto my-0.5 rounded-full shrink-0"></div>
 
-          <button onClick={() => setIsMuted(!isMuted)} className={`h-16 md:h-20 px-5 md:px-6 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 transition-all border-[4px] shrink-0 origin-right ${isMuted ? 'bg-slate-300 text-slate-600 border-white' : 'bg-white/95 text-amber-500 hover:scale-105 active:scale-95 border-amber-100'}`}>
-            <span className="font-black text-lg md:text-xl whitespace-nowrap">{isMuted ? '開啟音效' : '關閉音效'}</span>
-            {isMuted ? <VolumeX size={36} className="md:w-[42px] md:h-[42px] shrink-0" strokeWidth={3}/> : <Volume2 size={36} className="md:w-[42px] md:h-[42px] shrink-0" strokeWidth={3}/>}
+          <button onClick={() => setIsMuted(!isMuted)} className={`w-16 h-16 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center transition-all border-4 shrink-0 ${isMuted ? 'bg-slate-300 text-slate-600 border-white' : 'bg-white/90 text-amber-500 hover:scale-110 active:scale-95 border-amber-100'}`}>
+            {isMuted ? <VolumeX size={42} strokeWidth={3}/> : <Volume2 size={42} strokeWidth={3}/>}
           </button>
 
-          <button onClick={() => setShowExitConfirm(true)} className="h-16 md:h-20 px-5 md:px-6 bg-white/95 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.1)] flex items-center gap-3 text-rose-500 hover:bg-rose-50 hover:scale-105 active:scale-95 transition-all border-[4px] border-rose-100 shrink-0 origin-right">
-            <span className="font-black text-lg md:text-xl whitespace-nowrap">離開遊戲</span>
-            <LogOut size={36} className="md:w-[42px] md:h-[42px] shrink-0 ml-1" strokeWidth={3}/>
+          <button onClick={() => setShowExitConfirm(true)} className="w-16 h-16 bg-white/90 backdrop-blur-md rounded-full shadow-[0_5px_15px_rgba(0,0,0,0.05)] flex items-center justify-center text-rose-400 hover:bg-rose-50 hover:scale-110 active:scale-95 transition-all border-4 border-rose-100 shrink-0">
+            <LogOut size={38} strokeWidth={3} className="ml-1"/>
           </button>
         </div>
 
         <button 
           onClick={() => setIsMenuOpen(!isMenuOpen)} 
-          className={`w-20 h-20 md:w-24 md:h-24 rounded-full shadow-[0_5px_20px_rgba(0,0,0,0.15)] flex items-center justify-center transition-all duration-300 border-[5px] mt-2 z-10 origin-center ${isMenuOpen ? 'bg-sky-400 text-white border-white rotate-90 scale-95' : 'bg-white/95 backdrop-blur-md text-sky-500 border-sky-200 hover:scale-105'}`}
+          className={`w-20 h-20 rounded-full shadow-[0_5px_20px_rgba(0,0,0,0.15)] flex items-center justify-center transition-all duration-300 border-[5px] mt-1 z-10 ${isMenuOpen ? 'bg-sky-400 text-white border-white rotate-90 scale-95' : 'bg-white/95 backdrop-blur-md text-sky-500 border-sky-200 hover:scale-105'}`}
         >
-          {isMenuOpen ? <X size={44} className="md:w-[52px] md:h-[52px]" strokeWidth={3} /> : <Menu size={44} className="md:w-[52px] md:h-[52px]" strokeWidth={3} />}
+          {isMenuOpen ? <X size={44} strokeWidth={3} /> : <Menu size={44} strokeWidth={3} />}
         </button>
       </div>
 
       {showExitConfirm && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto">
-          <div className="bg-white p-8 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl flex flex-col items-center gap-4 md:gap-6 max-w-sm w-[92vw] max-h-[85vh] overflow-y-auto custom-scrollbar mx-4 animate-in zoom-in-95 spin-in-1 border-[6px] md:border-[8px] border-rose-100">
-            <div className="text-rose-500 bg-rose-50 p-5 md:p-6 rounded-full border-4 border-white shadow-inner shrink-0"><LogOut size={48} className="ml-1" strokeWidth={2.5}/></div>
+          <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full mx-4 animate-in zoom-in-95 spin-in-1 border-[8px] border-rose-100">
+            <div className="text-rose-500 bg-rose-50 p-6 rounded-full border-4 border-white shadow-inner"><LogOut size={48} className="ml-1" strokeWidth={2.5}/></div>
             <h3 className="text-3xl font-black text-slate-700">要離開遊戲嗎？🥺</h3>
             <p className="text-slate-400 text-center text-lg">離開後目前的進度就不見囉！</p>
             <div className="flex gap-4 w-full mt-4">
@@ -1318,8 +1239,8 @@ export default function App() {
 
       {selectedSquareInfo !== null && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setSelectedSquareInfo(null)}>
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[6px] md:border-[8px] border-sky-100 w-[92vw] max-w-sm max-h-[85vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative pt-12 md:pt-14" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setSelectedSquareInfo(null)} className="absolute top-3 right-3 md:top-4 md:right-4 text-white bg-rose-400 rounded-full p-1.5 md:p-2 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform z-50"><X size={24} strokeWidth={3}/></button>
+          <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 w-full max-w-sm animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setSelectedSquareInfo(null)} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3}/></button>
             
             {(() => {
                const sq = BOARD_SQUARES[selectedSquareInfo];
@@ -1382,8 +1303,8 @@ export default function App() {
 
       {showAssetManager && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setShowAssetManager(false)}>
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[6px] md:border-[8px] border-amber-100 w-[92vw] max-w-sm max-h-[85vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative pt-12 md:pt-14" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setShowAssetManager(false)} className="absolute top-3 right-3 md:top-4 md:right-4 text-white bg-rose-400 rounded-full p-1.5 md:p-2 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform z-50"><X size={24} strokeWidth={3}/></button>
+          <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-amber-100 w-full max-w-sm animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setShowAssetManager(false)} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3}/></button>
 
               <div className="flex flex-col items-center border-b-4 border-dashed border-amber-100 pb-4 mb-4">
                   <div className="w-16 h-16 bg-amber-50 rounded-full border-4 border-amber-200 flex items-center justify-center text-4xl mb-2 shadow-inner">💼</div>
@@ -1443,25 +1364,17 @@ export default function App() {
       )}
 
       {gameData.currentPlayerIdx === activePlayerIndex && !myPlayer?.isBankrupt && ['JAIL_BWA_BWEI', 'ACTION', 'END_TURN'].includes(gameData.gameState) && (
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[250] bg-white/95 backdrop-blur-md p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-[0_25px_50px_rgba(0,0,0,0.2)] border-[6px] md:border-[8px] border-sky-100 w-[95vw] md:min-w-[460px] max-w-[520px] text-center animate-in zoom-in-95 duration-300 pointer-events-auto flex flex-col items-center gap-4 md:gap-6 relative">
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[250] bg-white/95 backdrop-blur-md p-10 rounded-[3rem] shadow-[0_25px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 min-w-[380px] max-w-[95vw] text-center animate-in slide-in-from-bottom-8 duration-300 pointer-events-auto flex flex-col items-center gap-6">
           
-          {myPlayer?.isAI && (
-            <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-[300] flex items-center justify-center rounded-[1.5rem] md:rounded-[2.5rem]">
-               <div className="bg-indigo-500 text-white px-5 py-2 md:px-6 md:py-3 rounded-full font-black text-xl md:text-2xl animate-pulse shadow-lg flex items-center gap-2">
-                  🤖 電腦思考中...
-               </div>
-            </div>
-          )}
-
           {gameData.gameState === 'JAIL_BWA_BWEI' && (
-            <div className="flex flex-col items-center w-full px-1 md:px-2">
-              <div className="text-2xl md:text-3xl font-black text-rose-500 drop-shadow-sm mb-4 md:mb-6 bg-rose-50 px-5 md:px-6 py-2 rounded-full border-4 border-white shadow-sm">🚨 反省泡泡時間</div>
+            <div className="flex flex-col items-center w-full px-2">
+              <div className="text-3xl font-black text-rose-500 drop-shadow-sm mb-6 bg-rose-50 px-6 py-2 rounded-full border-4 border-white shadow-sm">🚨 反省泡泡時間</div>
               
-              <div className="flex gap-3 md:gap-5 justify-center mb-4 md:mb-6">
+              <div className="flex gap-5 justify-center mb-6">
                 {[0, 1, 2].map(i => {
                   const res = gameData.bwaBweiResults?.[i];
                   if (!res) return (
-                    <div key={i} className="w-[75px] h-[95px] md:w-[90px] md:h-[110px] border-[4px] md:border-[6px] border-dashed border-slate-200 rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center text-slate-200 font-black text-3xl md:text-4xl">?</div>
+                    <div key={i} className="w-[90px] h-[110px] border-[6px] border-dashed border-slate-200 rounded-[2rem] flex items-center justify-center text-slate-200 font-black text-4xl">?</div>
                   );
                   
                   const config = {
@@ -1472,39 +1385,39 @@ export default function App() {
                   const c = config[res];
 
                   return (
-                    <div key={i} className={`w-[75px] h-[95px] md:w-[90px] md:h-[110px] rounded-[1.5rem] md:rounded-[2rem] flex flex-col items-center justify-center border-[4px] animate-in zoom-in spin-in-12 ${c.color} transition-all`}>
-                      <div className="flex items-center justify-center gap-1 md:gap-2 mb-1 md:mb-2">
+                    <div key={i} className={`w-[90px] h-[110px] rounded-[2rem] flex flex-col items-center justify-center border-4 animate-in zoom-in spin-in-12 ${c.color} transition-all`}>
+                      <div className="flex items-center justify-center gap-2 mb-2">
                          {res === 'HOLY' && (
                            <>
-                             <BweiBlock isFlat={true} className="rotate-[15deg] scale-[0.6] md:scale-75" />
-                             <BweiBlock isFlat={false} className="-rotate-[15deg] scale-x-[-1] scale-[0.6] md:scale-75" />
+                             <BweiBlock isFlat={true} className="rotate-[15deg] scale-75" />
+                             <BweiBlock isFlat={false} className="-rotate-[15deg] scale-x-[-1] scale-75" />
                            </>
                          )}
                          {res === 'LAUGH' && (
                            <>
-                             <BweiBlock isFlat={true} className="rotate-[15deg] scale-[0.6] md:scale-75" />
-                             <BweiBlock isFlat={true} className="-rotate-[15deg] scale-x-[-1] scale-[0.6] md:scale-75" />
+                             <BweiBlock isFlat={true} className="rotate-[15deg] scale-75" />
+                             <BweiBlock isFlat={true} className="-rotate-[15deg] scale-x-[-1] scale-75" />
                            </>
                          )}
                          {res === 'YIN' && (
                            <>
-                             <BweiBlock isFlat={false} className="rotate-[15deg] scale-[0.6] md:scale-75" />
-                             <BweiBlock isFlat={false} className="-rotate-[15deg] scale-x-[-1] scale-[0.6] md:scale-75" />
+                             <BweiBlock isFlat={false} className="rotate-[15deg] scale-75" />
+                             <BweiBlock isFlat={false} className="-rotate-[15deg] scale-x-[-1] scale-75" />
                            </>
                          )}
                       </div>
-                      <span className={`font-black text-base md:text-lg mb-1 leading-none ${c.text}`}>{c.label}</span>
+                      <span className={`font-black text-lg mb-1 leading-none ${c.text}`}>{c.label}</span>
                     </div>
                   );
                 })}
               </div>
 
               {(gameData.bwaBweiResults || []).length < 3 ? (
-                <button onClick={handleThrowBwaBwei} className="w-full bg-rose-400 hover:bg-rose-300 text-white font-black py-3 md:py-4 px-6 rounded-[1.5rem] md:rounded-[2rem] active:translate-y-[6px] active:shadow-none active:border-b-0 transition-all shadow-[0_6px_0_0_#e11d48] text-xl md:text-2xl border-[4px] border-white flex justify-center items-center gap-2 mt-2">
+                <button onClick={handleThrowBwaBwei} className="w-full bg-rose-400 hover:bg-rose-300 text-white font-black py-5 px-6 rounded-[2rem] active:translate-y-[6px] active:shadow-none active:border-b-0 transition-all shadow-[0_6px_0_0_#e11d48] text-2xl border-[4px] border-white flex justify-center items-center gap-2 mt-3">
                   🙏 進行第 {(gameData.bwaBweiResults || []).length + 1} 次擲杯
                 </button>
               ) : (
-                <button onClick={handleFinishBwaBwei} className="w-full bg-emerald-400 hover:bg-emerald-300 text-white font-black py-3 md:py-4 px-6 rounded-[1.5rem] md:rounded-[2rem] active:translate-y-[6px] active:shadow-none active:border-b-0 transition-all shadow-[0_6px_0_0_#10b981] text-xl md:text-2xl border-[4px] border-white flex justify-center items-center gap-2 mt-2 animate-bounce">
+                <button onClick={handleFinishBwaBwei} className="w-full bg-emerald-400 hover:bg-emerald-300 text-white font-black py-5 px-6 rounded-[2rem] active:translate-y-[6px] active:shadow-none active:border-b-0 transition-all shadow-[0_6px_0_0_#10b981] text-2xl border-[4px] border-white flex justify-center items-center gap-2 mt-3 animate-bounce">
                   ✨ 查看神明旨意
                 </button>
               )}
@@ -1512,22 +1425,22 @@ export default function App() {
           )}
 
           {gameData.gameState !== 'JAIL_BWA_BWEI' && gameData.actionMessage && (
-            <div className="font-black text-slate-700 text-xl md:text-2xl leading-relaxed whitespace-pre-line px-2 md:px-4 text-center">
+            <div className="font-black text-slate-700 text-[1.6rem] leading-relaxed whitespace-pre-line px-4 text-center">
               {gameData.actionMessage}
             </div>
           )}
 
-          <div className="flex flex-col gap-3 md:gap-4 w-full mt-2 md:mt-3">
+          <div className="flex flex-col gap-4 w-full mt-3">
             {gameData.gameState === 'ACTION' && currentSquare?.type === 'PROPERTY' && !gameData.properties[myPlayer.pos] && (
               <button 
                 onClick={canBuy ? handleBuyProperty : undefined} 
                 disabled={!canBuy}
-                className={`font-black py-3 md:py-4 px-6 w-full rounded-[1.5rem] md:rounded-[2rem] transition-all text-xl md:text-2xl border-[4px] border-white flex flex-col items-center justify-center ${canBuy ? 'bg-sky-400 hover:bg-sky-300 text-white shadow-[0_6px_0_0_#0ea5e9] active:translate-y-[6px] active:shadow-none cursor-pointer' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}
+                className={`font-black py-5 px-8 w-full rounded-[2rem] transition-all text-3xl border-[4px] border-white flex flex-col items-center justify-center ${canBuy ? 'bg-sky-400 hover:bg-sky-300 text-white shadow-[0_6px_0_0_#0ea5e9] active:translate-y-[6px] active:shadow-none cursor-pointer' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}
               >
                 {!canBuy ? (
                   <>
-                    <span className="text-xl md:text-2xl">😢 沒辦法買耶</span>
-                    <span className="text-sm md:text-base font-bold text-rose-400 mt-1">
+                    <span className="text-2xl">😢 沒辦法買耶</span>
+                    <span className="text-base font-bold text-rose-400 mt-1">
                       {myMoney < reqMoney ? `錢錢還差 $${reqMoney - myMoney}` : `信用還差 ${reqTrust - myTrust} 點喔`}
                     </span>
                   </>
@@ -1538,7 +1451,7 @@ export default function App() {
             )}
             
             {(gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && (
-              <button onClick={handleEndTurn} className="bg-amber-400 w-full hover:bg-amber-300 text-amber-900 font-black py-3 md:py-4 px-6 rounded-[1.5rem] md:rounded-[2rem] active:translate-y-[6px] active:shadow-none transition-all shadow-[0_6px_0_0_#d97706] text-xl md:text-2xl border-[4px] border-white">
+              <button onClick={handleEndTurn} className="bg-amber-400 w-full hover:bg-amber-300 text-amber-900 font-black py-5 px-6 rounded-[2rem] active:translate-y-[6px] active:shadow-none transition-all shadow-[0_6px_0_0_#d97706] text-3xl border-[4px] border-white">
                 ✅ 換下一位囉！
               </button>
             )}
@@ -1672,7 +1585,7 @@ export default function App() {
 
                           <div 
                             onClick={(e) => {
-                               if (p.id === activePlayerIndex && !p.isAI) {
+                               if (p.id === activePlayerIndex) {
                                    e.stopPropagation();
                                    setShowAssetManager(true);
                                }
@@ -1682,15 +1595,14 @@ export default function App() {
                                 ? 'border-amber-400 scale-125 z-40 relative' 
                                 : 'border-slate-200 scale-[0.65] grayscale opacity-70 z-10' 
                             } ${
-                              p.id === activePlayerIndex && !p.isAI
+                              p.id === activePlayerIndex 
                                 ? 'cursor-pointer hover:ring-[6px] hover:ring-sky-300 hover:scale-[1.4] hover:grayscale-0 hover:opacity-100' 
                                 : ''
                             }`}
                           >
                             {p.icon}
-                            {p.isAI && <div className="absolute -top-1 -right-1 text-sm bg-indigo-500 text-white rounded-full w-6 h-6 flex items-center justify-center border-2 border-white shadow-md z-50">🤖</div>}
 
-                            {p.id === activePlayerIndex && !p.isBankrupt && !p.isAI && (
+                            {p.id === activePlayerIndex && !p.isBankrupt && (
                               <div className="absolute -bottom-2 -right-2 bg-amber-400 text-amber-900 p-1.5 rounded-full shadow-md border-4 border-white z-50 animate-bounce">
                                  <Briefcase size={18} strokeWidth={3}/>
                               </div>
@@ -1707,11 +1619,7 @@ export default function App() {
                                   </div>
                                 )}
                                 
-                                {p.isAI ? (
-                                    <div className="whitespace-nowrap px-6 py-3 bg-indigo-500 text-white rounded-[2rem] font-black text-2xl shadow-lg border-[4px] border-white animate-pulse">
-                                      🤖 電腦思考中...
-                                    </div>
-                                ) : myPlayer?.jailRoundsLeft === -1 ? (
+                                {myPlayer?.jailRoundsLeft === -1 ? (
                                   <button onClick={() => syncGameData({ gameState: 'JAIL_BWA_BWEI', bwaBweiResults: [] })} className="whitespace-nowrap px-8 py-4 bg-rose-400 hover:bg-rose-300 text-white rounded-[2rem] font-black text-3xl shadow-[0_8px_0_0_#e11d48,0_10px_20px_rgba(0,0,0,0.1)] active:shadow-none active:translate-y-[8px] active:border-b-0 transition-all flex items-center gap-3 border-[4px] border-white">
                                     🙏 開始擲杯！
                                   </button>
