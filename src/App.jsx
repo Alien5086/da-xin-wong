@@ -91,7 +91,8 @@ const formatTime = (seconds) => {
   if (seconds === -1) return "不限時";
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
+  const sStr = s.toString();
+  return m + ':' + sStr.padStart(2, '0');
 };
 
 const checkBankruptcy = (players) => {
@@ -314,7 +315,13 @@ export default function App() {
   const reqMoney = Number((currentSquare && currentSquare.price) || 0);
   const reqTrust = Number((currentSquare && currentSquare.reqTrust) || 0);
   
-  const displayZoom = isFullMapMode ? Math.min(viewportSize.w / MAP_SIZE, viewportSize.h / MAP_SIZE) * 0.9 : zoom;
+  let displayZoom = zoom;
+  if (isFullMapMode) {
+      const wRatio = viewportSize.w / MAP_SIZE;
+      const hRatio = viewportSize.h / MAP_SIZE;
+      const minRatio = Math.min(wRatio, hRatio);
+      displayZoom = minRatio * 0.9;
+  }
   const inverseZoom = 1 / displayZoom; 
   const canBuy = Boolean(currentSquare && myMoney >= reqMoney && myTrust >= reqTrust);
   
@@ -329,7 +336,7 @@ export default function App() {
 
   const safeDice = displayDice || [1, 1];
 
-  // 判定當前使用者是否為產權交易的收購方對象 (單機模式強制讓收購邀請顯示)
+  // 判定當前使用者是否為產權交易的收購方對象
   const isTradeActive = Boolean(gameData.pendingTrade && (isOfflineMode || gameData.pendingTrade.buyerIdx === activePlayerIndex));
   const tradeBuyer = gameData.pendingTrade ? gameData.players[gameData.pendingTrade.buyerIdx] : null;
   const tradeBuyerMoney = tradeBuyer ? Number(tradeBuyer.money || 0) : 0;
@@ -346,7 +353,8 @@ export default function App() {
     } else {
         if (!auth.currentUser) return;
         try {
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId), updates);
+            const roomDoc = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+            await updateDoc(roomDoc, updates);
         } catch (e) { console.error("Sync error", e); }
     }
   }, [isOfflineMode, roomId]);
@@ -368,7 +376,10 @@ export default function App() {
     if (isMuted) {
       bgmRef.current.pause();
     } else if (bgmStarted) {
-      bgmRef.current.play().catch(() => console.log("等待使用者互動以播放音樂"));
+      const p = bgmRef.current.play();
+      if (p !== undefined) {
+          p.catch(() => console.log("等待使用者互動以播放音樂"));
+      }
     }
   }, [isMuted, bgmStarted]);
 
@@ -551,7 +562,9 @@ export default function App() {
     if (!user) return;
     playSound('win', isMuted); 
     setIsOfflineMode(false);
-    const id = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const rStr = Math.random().toString(36);
+    const subStr = rStr.substring(2, 8);
+    const id = subStr.toUpperCase();
     
     const players = [];
     for (let i = 0; i < setupPlayerCount; i++) {
@@ -568,7 +581,8 @@ export default function App() {
     }
     
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
+      const roomDoc = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id);
+      await setDoc(roomDoc, {
         players: players, 
         currentPlayerIdx: 0, 
         gameState: 'IDLE', 
@@ -590,8 +604,8 @@ export default function App() {
     playSound('win', isMuted); 
     setIsOfflineMode(false);
     try {
-      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-      const snap = await getDoc(roomRef);
+      const roomDoc = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+      const snap = await getDoc(roomDoc);
       if (!snap.exists()) { setErrorMsg("找不到房號！"); return; }
       const data = snap.data();
       
@@ -616,7 +630,7 @@ export default function App() {
       data.players[emptySlot].name = setupName.trim() || `玩家 ${emptySlot + 1}`;
       data.players[emptySlot].inJail = false; 
       
-      await updateDoc(roomRef, { players: data.players });
+      await updateDoc(roomDoc, { players: data.players });
       setMyPlayerIndex(emptySlot); setAppPhase('GAME');
       if (data.timeLeft !== -1) setLocalTimeLeft(data.timeLeft);
     } catch (e) { setErrorMsg("加入失敗。"); }
@@ -627,8 +641,10 @@ export default function App() {
 
     playSound('roll', isMuted); 
 
-    const d1 = Math.floor(Math.random() * 6) + 1;
-    const d2 = Math.floor(Math.random() * 6) + 1;
+    const r1 = Math.random();
+    const d1 = Math.floor(r1 * 6) + 1;
+    const r2 = Math.random();
+    const d2 = Math.floor(r2 * 6) + 1;
     const steps = d1 + d2;
 
     await syncGameData({
@@ -642,7 +658,11 @@ export default function App() {
   useEffect(() => {
     if (gameData.gameState === 'ROLLING') {
       const interval = setInterval(() => {
-        setDisplayDice([Math.floor(Math.random()*6)+1, Math.floor(Math.random()*6)+1]);
+        const r1 = Math.random();
+        const v1 = Math.floor(r1 * 6) + 1;
+        const r2 = Math.random();
+        const v2 = Math.floor(r2 * 6) + 1;
+        setDisplayDice([v1, v2]);
       }, 100);
       return () => clearInterval(interval);
     } else {
@@ -730,7 +750,9 @@ export default function App() {
       nextState = 'END_TURN';
     } else if (sq.type === 'CHANCE_GOOD' || sq.type === 'CHANCE_BAD') {
       const cardPool = sq.type === 'CHANCE_GOOD' ? GOOD_CARDS : BAD_CARDS;
-      const card = cardPool[Math.floor(Math.random() * cardPool.length)];
+      const r = Math.random();
+      const cardIdx = Math.floor(r * cardPool.length);
+      const card = cardPool[cardIdx];
       
       msg += `【 ${card.desc} 】\n\n`;
       if (card.goToJail) {
@@ -1095,6 +1117,18 @@ export default function App() {
 
 
   if (appPhase === 'LANDING') {
+    const localPlayerIndices = [];
+    for (let i = 0; i < setupPlayerCount; i++) {
+        localPlayerIndices.push(i);
+    }
+    const playerCountOptions = [2, 3, 4, 5, 6];
+    const timeLimitOptions = [
+        { l: '5 分', v: 300 },
+        { l: '10 分', v: 600 },
+        { l: '20 分', v: 1200 },
+        { l: '不限時', v: -1 }
+    ];
+
     return (
       <div className="min-h-screen w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-4 md:p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
         <style>{`
@@ -1145,7 +1179,7 @@ export default function App() {
                   <div className="w-full">
                     <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><UsersIcon size={20}></UsersIcon> 幾個人一起玩呢？</div>
                     <div className="flex flex-wrap justify-center gap-2 md:gap-3">
-                      {[2, 3, 4, 5, 6].map(num => (
+                      {playerCountOptions.map(num => (
                         <button key={num} onClick={() => setSetupPlayerCount(num)} className={`w-12 h-12 md:w-14 md:h-14 rounded-full text-xl md:text-2xl transition-all border-4 border-white ${setupPlayerCount === num ? 'bg-amber-400 text-amber-900 scale-110 shadow-[0_4px_0_0_#d97706]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>
                           {num}
                         </button>
@@ -1158,7 +1192,7 @@ export default function App() {
                   <div className="w-full">
                     <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><Clock size={20}></Clock> 玩多久呢？</div>
                     <div className="flex flex-wrap justify-center gap-2 md:gap-3">
-                      {[{l: '5 分', v: 300}, {l: '10 分', v: 600}, {l: '20 分', v: 1200}, {l: '不限時', v: -1}].map(t => (
+                      {timeLimitOptions.map(t => (
                         <button key={t.v} onClick={() => setSetupTimeLimit(t.v)} className={`px-4 py-2 md:px-5 md:py-3 rounded-[1.5rem] transition-all border-4 border-white text-sm md:text-base ${setupTimeLimit === t.v ? 'bg-pink-400 text-pink-900 shadow-[0_4px_0_0_#db2777]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>
                           {t.l}
                         </button>
@@ -1172,7 +1206,7 @@ export default function App() {
                     <div className="w-full bg-sky-50 rounded-[2rem] p-4 md:p-5 border-4 border-white shadow-sm h-full flex flex-col">
                       <div className="text-center text-sky-800 mb-2 md:mb-3 text-base md:text-lg">幫角色取名字＆換頭像吧！👇</div>
                       <div className="flex flex-wrap justify-center gap-2 md:gap-3 mb-3 md:mb-4">
-                        {[0, 1, 2, 3, 4, 5].slice(0, setupPlayerCount).map((i) => (
+                        {localPlayerIndices.map((i) => (
                           <div key={i} className="flex flex-col items-center gap-1 md:gap-2">
                             <button 
                               onClick={() => setEditingLocalPlayer(i)}
@@ -1204,9 +1238,11 @@ export default function App() {
                           type="text" 
                           value={localNames[editingLocalPlayer]} 
                           onChange={e => {
+                            const val = e.target.value;
+                            const sub = val.substring(0, 6);
                             const newNames = [];
                             for(let j=0; j<localNames.length; j++) { newNames.push(localNames[j]); }
-                            newNames[editingLocalPlayer] = e.target.value.substring(0, 6);
+                            newNames[editingLocalPlayer] = sub;
                             setLocalNames(newNames);
                           }} 
                           placeholder={`玩家 ${editingLocalPlayer + 1} 名字`}
@@ -1242,7 +1278,10 @@ export default function App() {
                         <input 
                           type="text" 
                           value={setupName} 
-                          onChange={e => setSetupName(e.target.value.substring(0, 6))} 
+                          onChange={e => {
+                              const val = e.target.value;
+                              setSetupName(val.substring(0, 6));
+                          }} 
                           placeholder="輸入你的名字"
                           className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors"
                         ></input>
@@ -1275,7 +1314,11 @@ export default function App() {
                     <div className="text-center text-sky-700 mb-3 text-lg md:text-xl">請輸入房間密碼 🔑</div>
                     <input 
                       type="text" placeholder="A1B2C3" 
-                      value={roomId} onChange={e => setRoomId(e.target.value.toUpperCase())} 
+                      value={roomId} 
+                      onChange={e => {
+                          const val = e.target.value;
+                          setRoomId(val.toUpperCase());
+                      }} 
                       className="w-full bg-white p-4 md:p-5 rounded-[2rem] text-center text-3xl md:text-4xl font-black border-[4px] border-sky-200 focus:border-amber-400 outline-none uppercase tracking-widest text-[#4a3424] shadow-inner" 
                     ></input>
                   </div>
@@ -1289,7 +1332,10 @@ export default function App() {
                       <input 
                         type="text" 
                         value={setupName} 
-                        onChange={e => setSetupName(e.target.value.substring(0, 6))} 
+                        onChange={e => {
+                            const val = e.target.value;
+                            setSetupName(val.substring(0, 6));
+                        }} 
                         placeholder="輸入你的名字"
                         className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors"
                       ></input>
@@ -1351,6 +1397,8 @@ export default function App() {
         </div>
      );
   }
+
+  const bwaIndices = [0, 1, 2];
 
   return (
     <div className="h-screen w-screen bg-[#e0f2fe] overflow-hidden relative touch-none select-none font-black text-[#4a3424] flex flex-col">
@@ -1482,7 +1530,7 @@ export default function App() {
                      <div className="flex flex-col items-center w-full px-1 md:px-2">
                        <div className="text-2xl font-black text-rose-500 mb-6 bg-rose-50 px-8 py-3 rounded-full border-4 border-white shadow-sm font-black font-black">🚨 靜心房擲杯判定</div>
                        <div className="flex gap-4 mb-8">
-                         {[0,1,2].map(i => {
+                         {bwaIndices.map(i => {
                            const res = (gameData.bwaBweiResults || [])[i];
                            return <div key={i} className={`w-24 h-28 rounded-2xl flex flex-col items-center justify-center border-4 shadow-sm ${res === 'HOLY' ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
                              <div className="flex scale-75 mb-2">
