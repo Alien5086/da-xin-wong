@@ -117,7 +117,7 @@ const clearBankruptProperties = (props, bankruptPlayerIds) => {
 };
 
 // =========================================================
-// 👇 請將您的 Firebase 金鑰貼在下方的引號 "" 內 👇
+// Firebase 初始化
 // =========================================================
 const getFirebaseConfig = () => {
   try {
@@ -136,14 +136,12 @@ const getFirebaseConfig = () => {
     appId: "1:72871979370:web:97caab1074d5f1e8f9dd13"
   };
 };
-// =========================================================
 
 const firebaseConfig = getFirebaseConfig();
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
-
 // =========================================================
 
 // 🌟 Web Audio API 音效
@@ -721,9 +719,16 @@ export default function App() {
        nextState = 'END_TURN';
     }
 
+    // 修正：將深層計算提取出來，避免 Rollup / Vite 打包時發生 AST 解析器崩潰
+    let updatedProperties = gameData.properties;
+    if (bankruptCheck.changed) {
+        const bankruptIds = bankruptCheck.newPlayers.filter(p => p.isBankrupt).map(bp => bp.id);
+        updatedProperties = clearBankruptProperties(gameData.properties, bankruptIds);
+    }
+
     await syncGameData({
       players: bankruptCheck.newPlayers,
-      properties: bankruptCheck.changed ? clearBankruptProperties(gameData.properties, bankruptCheck.newPlayers.filter(p=>p.isBankrupt).map(p=>p.id)) : gameData.properties,
+      properties: updatedProperties,
       gameState: nextState,
       actionMessage: msg,
       bwaBweiResults: [] 
@@ -906,9 +911,16 @@ export default function App() {
           nextState = 'GAME_OVER';
       }
 
+      // 修正：將深層計算提取出來，避免 Rollup / Vite 打包時發生 AST 解析器崩潰
+      let updatedProperties = gameData.properties;
+      if (bankruptCheck.changed) {
+          const bankruptIds = bankruptCheck.newPlayers.filter(p => p.isBankrupt).map(bp => bp.id);
+          updatedProperties = clearBankruptProperties(gameData.properties, bankruptIds);
+      }
+
       await syncGameData({
         players: bankruptCheck.newPlayers,
-        properties: bankruptCheck.changed ? clearBankruptProperties(gameData.properties, bankruptCheck.newPlayers.filter(p=>p.isBankrupt).map(p=>p.id)) : gameData.properties,
+        properties: updatedProperties,
         currentPlayerIdx: nextIdx,
         gameState: nextState,
         actionMessage: msg
