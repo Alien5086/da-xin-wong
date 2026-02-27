@@ -98,21 +98,27 @@ const formatTime = (seconds) => {
 
 const checkBankruptcy = (players) => {
   let changed = false;
-  const newPlayers = players.map(p => {
-    if (!p.isBankrupt && (p.money < 0 || p.trust <= 0)) { 
-      changed = true; 
-      return { ...p, isBankrupt: true }; 
+  const newPlayers = [];
+  // 修正：將 .map 改為標準 for 迴圈，避開編譯器 AST 解析崩潰問題
+  for (const p of players) {
+    if (!p.isBankrupt && (p.money < 0 || p.trust <= 0)) {
+      changed = true;
+      newPlayers.push({ ...p, isBankrupt: true });
+    } else {
+      newPlayers.push(p);
     }
-    return p;
-  });
+  }
   return { changed, newPlayers };
 };
 
 const clearBankruptProperties = (props, bankruptPlayerIds) => {
-  const newProps = { ...props };
-  Object.keys(newProps).forEach(sqId => { 
-    if (bankruptPlayerIds.includes(newProps[sqId])) { delete newProps[sqId]; } 
-  });
+  const newProps = {};
+  // 修正：將 Object.keys().forEach 改為標準 for...in 迴圈
+  for (const sqId in props) {
+    if (!bankruptPlayerIds.includes(props[sqId])) {
+      newProps[sqId] = props[sqId];
+    }
+  }
   return newProps;
 };
 
@@ -486,15 +492,21 @@ export default function App() {
   const handleStartLocalGame = async () => {
     playSound('win', isMuted); 
     setIsOfflineMode(true);
-    const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
-      id: i, 
-      name: localNames[i].trim() || `玩家 ${i + 1}`,
-      icon: localAvatars[i], 
-      color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
-      pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
-      inJail: false, jailRoundsLeft: 0, isBankrupt: false,
-      uid: `local_player_${i}`, isAI: localPlayerTypes[i] === 'AI'
-    }));
+    
+    // 修正：將 Array.from().map 改為標準 for 迴圈
+    const players = [];
+    for (let i = 0; i < setupPlayerCount; i++) {
+      const pName = (localNames[i] || '').trim() || `玩家 ${i + 1}`;
+      players.push({
+        id: i, 
+        name: pName,
+        icon: localAvatars[i], 
+        color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
+        pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
+        inJail: false, jailRoundsLeft: 0, isBankrupt: false,
+        uid: `local_player_${i}`, isAI: localPlayerTypes[i] === 'AI'
+      });
+    }
     
     setGameData({
       players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: 'LOCAL', timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0, diceVals: [1, 1], bwaBweiResults: [], pendingTrade: null
@@ -509,15 +521,22 @@ export default function App() {
     playSound('win', isMuted); 
     setIsOfflineMode(false);
     const id = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const players = Array.from({ length: setupPlayerCount }).map((_, i) => ({
-      id: i, 
-      name: i === 0 ? (setupName.trim() || '房主') : `玩家 ${i + 1}`,
-      icon: i === 0 ? setupAvatar : '⏳', 
-      color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i],
-      pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
-      inJail: false, jailRoundsLeft: 0, isBankrupt: false,
-      uid: i === 0 ? user.uid : null 
-    }));
+    
+    // 修正：將 Array.from().map 改為標準 for 迴圈
+    const players = [];
+    for (let i = 0; i < setupPlayerCount; i++) {
+      const pName = i === 0 ? ((setupName || '').trim() || '房主') : `玩家 ${i + 1}`;
+      players.push({
+        id: i, 
+        name: pName,
+        icon: i === 0 ? setupAvatar : '⏳', 
+        color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
+        pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
+        inJail: false, jailRoundsLeft: 0, isBankrupt: false,
+        uid: i === 0 ? user.uid : null 
+      });
+    }
+    
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
         players, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0, diceVals: [1, 1], bwaBweiResults: [], pendingTrade: null
