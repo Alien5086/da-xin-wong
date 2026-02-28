@@ -7,10 +7,7 @@ import {
   ZoomIn, ZoomOut, Menu
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, doc, setDoc, onSnapshot, updateDoc, 
-  getDoc 
-} from 'firebase/firestore';
+import { getFirestore, doc, setDoc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 
 // --- Helper Functions to Avoid Compiler Bugs ---
@@ -41,6 +38,7 @@ function getPlayerById(playersArr, id) {
 // --- 1. 遊戲基礎資料與卡牌庫 ---
 const BASE_MONEY = 17200; 
 const BASE_TRUST = 10; 
+const MAP_SIZE = 1900; // 修復: 補回地圖尺寸常數
 
 const GOOD_CARDS = [
   { desc: '扶老奶奶過馬路', effectM: 200, effectT: 3 },
@@ -189,13 +187,13 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
 
-// 🌟 Web Audio API 音效
+// =========================================================
+// UI 與音效輔助函式 (修復: 補回先前遺失的變數)
+// =========================================================
 let audioCtx = null;
-const playSound = function(type, isMuted) {
+const playSound = (type, isMuted) => {
   if (isMuted || typeof window === 'undefined') return;
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') audioCtx.resume();
   
   const now = audioCtx.currentTime;
@@ -219,36 +217,35 @@ const playSound = function(type, isMuted) {
     case 'bwa':
       osc.type = 'square'; osc.frequency.setValueAtTime(150, now); gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05); osc.start(now); osc.stop(now + 0.05); break;
     case 'roll':
-      for(let i=0; i<6; i++) { const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.type = 'triangle'; o.frequency.setValueAtTime(300 + Math.random()*300, now + i*0.08); g.gain.setValueAtTime(0.1, now + i*0.08); g.gain.exponentialRampToValueAtTime(0.01, now + i*0.08 + 0.05); o.start(now + i*0.08); o.stop(now + i*0.08 + 0.05); } break;
+      for(let i=0; i<6; i++) { 
+          const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); 
+          o.connect(g); g.connect(audioCtx.destination); o.type = 'triangle'; 
+          o.frequency.setValueAtTime(300 + Math.random()*300, now + i*0.08); 
+          g.gain.setValueAtTime(0.1, now + i*0.08); g.gain.exponentialRampToValueAtTime(0.01, now + i*0.08 + 0.05); 
+          o.start(now + i*0.08); o.stop(now + i*0.08 + 0.05); 
+      } break;
+    default: break;
   }
 };
 
-const getOwnerBodyClass = function(colorClass) {
-  if (colorClass === 'bg-sky-300') return 'bg-sky-100';
-  if (colorClass === 'bg-rose-300') return 'bg-rose-100';
-  if (colorClass === 'bg-emerald-300') return 'bg-emerald-100';
-  if (colorClass === 'bg-purple-300') return 'bg-purple-100';
-  if (colorClass === 'bg-orange-300') return 'bg-orange-100';
-  if (colorClass === 'bg-pink-300') return 'bg-pink-100';
-  return 'bg-slate-100';
+const getOwnerBodyClass = (colorClass) => {
+  const map = {
+    'bg-sky-300': 'bg-sky-100', 'bg-rose-300': 'bg-rose-100', 'bg-emerald-300': 'bg-emerald-100',
+    'bg-purple-300': 'bg-purple-100', 'bg-orange-300': 'bg-orange-100', 'bg-pink-300': 'bg-pink-100',
+  };
+  return map[colorClass] || 'bg-slate-100';
 };
 
-const getOwnerBorderClass = function(colorClass) {
-  if (colorClass === 'bg-sky-300') return 'border-sky-300';
-  if (colorClass === 'bg-rose-300') return 'border-rose-300';
-  if (colorClass === 'bg-emerald-300') return 'border-emerald-300';
-  if (colorClass === 'bg-purple-300') return 'border-purple-300';
-  if (colorClass === 'bg-orange-300') return 'border-orange-300';
-  if (colorClass === 'bg-pink-300') return 'border-pink-300';
-  return 'border-slate-300';
+const getOwnerBorderClass = (colorClass) => {
+  const map = {
+    'bg-sky-300': 'border-sky-300', 'bg-rose-300': 'border-rose-300', 'bg-emerald-300': 'border-emerald-300',
+    'bg-purple-300': 'border-purple-300', 'bg-orange-300': 'border-orange-300', 'bg-pink-300': 'border-pink-300',
+  };
+  return map[colorClass] || 'border-slate-300';
 };
 
-const DiceIcon = function(props) {
-  const val = props.value || 1;
-  const className = props.className;
-  const style = props.style;
-  const strokeWidth = props.strokeWidth;
-
+const DiceIcon = ({ value, className, style, strokeWidth }) => {
+  const val = value || 1;
   if (val === 1) return <Dice1 className={className} style={style} strokeWidth={strokeWidth} />;
   if (val === 2) return <Dice2 className={className} style={style} strokeWidth={strokeWidth} />;
   if (val === 3) return <Dice3 className={className} style={style} strokeWidth={strokeWidth} />;
@@ -257,10 +254,7 @@ const DiceIcon = function(props) {
   return <Dice6 className={className} style={style} strokeWidth={strokeWidth} />;
 };
 
-const BweiBlock = function(props) {
-  const isFlat = props.isFlat;
-  const className = props.className || "";
-
+const BweiBlock = ({ isFlat, className = "" }) => {
   if (isFlat) {
       return (
         <div className={`relative ${className}`}>
@@ -269,16 +263,15 @@ const BweiBlock = function(props) {
           </div>
         </div>
       );
-  } else {
-      return (
-        <div className={`relative ${className}`}>
-          <div className="w-[32px] h-[75px] bg-[#be123c] border-[2px] border-[#881337] rounded-r-[40px] rounded-l-[6px] shadow-[inset_-6px_0_10px_rgba(0,0,0,0.5)] drop-shadow-xl relative overflow-hidden">
-             <div className="absolute top-2 bottom-2 right-1.5 w-[6px] bg-white/40 rounded-full blur-[2px]" />
-             <div className="absolute top-4 bottom-4 right-2.5 w-[2px] bg-white/60 rounded-full blur-[0.5px]" />
-          </div>
-        </div>
-      );
   }
+  return (
+    <div className={`relative ${className}`}>
+      <div className="w-[32px] h-[75px] bg-[#be123c] border-[2px] border-[#881337] rounded-r-[40px] rounded-l-[6px] shadow-[inset_-6px_0_10px_rgba(0,0,0,0.5)] drop-shadow-xl relative overflow-hidden">
+         <div className="absolute top-2 bottom-2 right-1.5 w-[6px] bg-white/40 rounded-full blur-[2px]" />
+         <div className="absolute top-4 bottom-4 right-2.5 w-[2px] bg-white/60 rounded-full blur-[0.5px]" />
+      </div>
+    </div>
+  );
 };
 
 // --- 主程式組件 ---
@@ -333,8 +326,6 @@ export default function App() {
   const dragStatus = useRef({ isDragging: false, startX: 0, startY: 0, initX: 0, initY: 0, moved: false });
   const mapRef = useRef(null);
 
-  const MAP_SIZE = 1900; 
-
   const activePlayerIndex = isOfflineMode ? gameData.currentPlayerIdx : (myPlayerIndex !== null ? myPlayerIndex : 0);
   const myPlayer = getPlayerById(gameData.players, activePlayerIndex);
   
@@ -365,10 +356,14 @@ export default function App() {
   }
 
   const safeDice = displayDice || [1, 1];
-  const pendingBuyerId = gameData.pendingTrade ? gameData.pendingTrade.buyerIdx : -1;
-  const isTradeActive = Boolean(gameData.pendingTrade && (isOfflineMode || pendingBuyerId === activePlayerIndex));
+
+  let pendingBuyerId = -1;
+  if (gameData.pendingTrade && gameData.pendingTrade.buyerIdx !== undefined) {
+      pendingBuyerId = gameData.pendingTrade.buyerIdx;
+  }
+  const isTradeActive = Boolean(gameData.pendingTrade !== null && (isOfflineMode || pendingBuyerId === activePlayerIndex));
   const tradeBuyer = getPlayerById(gameData.players, pendingBuyerId);
-  const tradeBuyerMoney = tradeBuyer ? Number(tradeBuyer.money || 0) : 0;
+  const tradeBuyerMoney = tradeBuyer && tradeBuyer.money ? Number(tradeBuyer.money) : 0;
 
   const syncGameData = useCallback(async function(updates) {
     if (isOfflineMode) {
@@ -553,7 +548,6 @@ export default function App() {
     focusOnCurrentPlayer();
   }, [gameData.currentPlayerIdx, gameData.players, isFullMapMode, displayZoom, viewportSize, appPhase, focusOnCurrentPlayer]);
 
-  // 新增/替換遊戲核心邏輯：加入回合、格字事件判斷與更新
   const handleStartLocalGame = async function() {
     playSound('win', isMuted); 
     setIsOfflineMode(true);
@@ -842,6 +836,8 @@ export default function App() {
       msg += `在 ${sq.name} 休息一天 💤`;
       nextState = 'END_TURN';
     }
+
+    nextPlayers[activePlayerIndex] = currPlayerClone;
 
     const bkResult = checkBankruptcy(nextPlayers);
     const bankruptPlayers = bkResult.newPlayers;
@@ -1544,6 +1540,7 @@ export default function App() {
               }
               const pos = INACTIVE_OFFSETS[myInactiveIdx % INACTIVE_OFFSETS.length];
               tX = pos.x; tY = pos.y;
+              inactiveCount++;
           }
 
           let movingBubble = null;
@@ -1706,11 +1703,11 @@ export default function App() {
 
       {selectedSquareInfo !== null && (() => {
         const sq = BOARD_SQUARES[selectedSquareInfo];
+        const ownerId = gameData.properties ? gameData.properties[sq.id] : undefined;
         let owner = null;
-        if (gameData.properties && gameData.properties[sq.id] !== undefined) {
-            const oId = gameData.properties[sq.id];
+        if (ownerId !== undefined) {
             for (let i = 0; i < gameData.players.length; i++) {
-                if (gameData.players[i].id === oId) { owner = gameData.players[i]; break; }
+                if (gameData.players[i].id === ownerId) { owner = gameData.players[i]; break; }
             }
         }
         const rentPrice = Math.floor(sq.price * 0.4);
