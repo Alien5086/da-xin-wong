@@ -9,7 +9,7 @@ import { getFirestore, doc, setDoc, onSnapshot, updateDoc, getDoc } from 'fireba
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 
 // =========================================================
-// 1. 全域常數與純函數 (完全避免閉包與 Block Scope)
+// 1. 全域常數與純函數
 // =========================================================
 var BASE_MONEY = 17200; 
 var BASE_TRUST = 10; 
@@ -437,7 +437,7 @@ function LandingScreen(props) {
       </div>
     </div>
   );
-};
+}
 
 // =========================================================
 // 5. 主程式 App 元件
@@ -985,6 +985,140 @@ export default function App() {
     });
   };
 
+  // =============== FIX: 將這 6 個 handler 綁定到 useRef 中，隔絕 useEffect 重構觸發 ===============
+  var handlersRef = useRef({});
+  handlersRef.current = {
+      handleRollDice: handleRollDice,
+      handleLandOnSquare: handleLandOnSquare,
+      handleThrowBwaBwei: async function() {
+        if (gameData.currentPlayerIdx !== activePlayerIndex) return;
+        playSound('bwa', isMuted); 
+        await syncGameData({ gameState: 'BWA_BWEI_ROLLING' });
+      },
+      handleFinishBwaBwei: async function() {
+        var nextPlayers = clonePlayers(gameData.players);
+        var currP = nextPlayers[activePlayerIndex];
+        var holyCount = 0;
+        var results = gameData.bwaBweiResults || [];
+        for (var i = 0; i < results.length; i++) {
+            if (results[i] === 'HOLY') holyCount++;
+        }
+        var msg = '總共擲出【 ' + holyCount + ' 次聖杯 】\n';
+        if (holyCount === 3) {
+          playSound('win', isMuted); 
+          currP.jailRoundsLeft = 0; currP.money -= 500; currP.inJail = false;
+          msg += '✨ 神明原諒你了！(繳交罰款 $500)\n你重獲自由，下回合可正常玩囉！';
+        } else {
+          playSound('bad', isMuted); 
+          var waitRounds = 3 - holyCount; currP.jailRoundsLeft = waitRounds;
+          msg += '神明要你繼續反省...\n需在泡泡裡等待 ' + waitRounds + ' 輪。';
+        }
+        await syncGameData({ players: nextPlayers, gameState: 'END_TURN', actionMessage: msg, bwaBweiResults: [] });
+      },
+      handleBuyProperty: async function() {
+        try {
+          var player = getPlayerById(gameData.players, activePlayerIndex);
+          if (!player) return;
+          var sq = BOARD_SQUARES[player.pos];
+          if (myMoney >= reqMoney && myTrust >= reqTrust) {
+            playSound('coin', isMuted); 
+            var nextPlayers = clonePlayers(gameData.players);
+            nextPlayers[activePlayerIndex].money -= reqMoney;
+            var nextProps = cloneObj(gameData.properties);
+            nextProps[sq.id] = player.id;
+            await syncGameData({ players: nextPlayers, properties: nextProps, gameState: 'END_TURN', actionMessage: '🎉 成功買下 ' + sq.name + ' 囉！' });
+          }
+        } catch(e) { }
+      },
+      handleEndTurn: async function() {
+        try {
+          playSound('click', isMuted); 
+          var nextPlayers = clonePlayers(gameData.players);
+          var nextIdx = gameData.currentPlayerIdx;
+          var attempts = 0;
+          do {
+              nextIdx = (nextIdx + 1) % nextPlayers.length;
+              attempts++;
+          } while (nextPlayers[nextIdx].isBankrupt && attempts < 10);
+
+          var nextPlayerClone = nextPlayers[nextIdx];
+          var nextState = 'IDLE';
+          var msg = '';
+
+          if (nextPlayerClone.inJail && nextPlayerClone.jailRoundsLeft > 0) {
+              nextPlayerClone.jailRoundsLeft -= 1;
+              if (nextPlayerClone.jailRoundsLeft === 0) {
+                  nextPlayerClone.money -= 500; nextPlayerClone.inJail = false;
+                  msg = '🌟 ' + nextPlayerClone.name + ' 反省期滿，扣除罰金 $500。\n離開反省泡泡，可正常行動囉！';
+              } else {
+                  nextState = 'END_TURN'; 
+                  msg = '🔒 ' + nextPlayerClone.name + ' 仍在反省泡泡中...\n(還要等 ' + nextPlayerClone.jailRoundsLeft + ' 輪喔)';
+              }
+          }
+
+          var bkResult = checkBankruptcy(nextPlayers);
+          var bankruptPlayers = bkResult.newPlayers;
+
+          if (bankruptPlayers[nextIdx].isBankrupt && nextPlayerClone.inJail === false) {
+              msg += '\n🚨 資金或信用歸零，宣告破產！';
+              nextState = 'END_TURN';
+          }
+
+          var activeCount = 0; var aliveCount = 0;
+          for (var i = 0; i < bankruptPlayers.length; i++) {
+              var bp = bankruptPlayers[i];
+              if (isOfflineMode || bp.uid !== null) {
+                  activeCount++;
+                  if (!bp.isBankrupt) aliveCount++;
+              }
+          }
+          if (activeCount > 1 && aliveCount <= 1) nextState = 'GAME_OVER';
+
+          var nextProps = Object.assign({}, gameData.properties);
+          if (bkResult.changed) {
+              var bankruptIds = [];
+              for (var j = 0; j < bankruptPlayers.length; j++) {
+                  if (bankruptPlayers[j].isBankrupt) bankruptIds.push(bankruptPlayers[j].id);
+              }
+              nextProps = clearBankruptProperties(gameData.properties, bankruptIds);
+          }
+
+          await syncGameData({ players: bankruptPlayers, properties: nextProps, currentPlayerIdx: nextIdx, gameState: nextState, actionMessage: msg });
+        } catch(e) { console.error(e); }
+      },
+      handleRespondTrade: async function(accept) {
+        if (!gameData.pendingTrade) return;
+        var trade = gameData.pendingTrade;
+        if (accept) {
+            playSound('coin', isMuted);
+            var nextPlayers = clonePlayers(gameData.players);
+            var sIdx = -1; var bIdx = -1;
+            for (var i = 0; i < nextPlayers.length; i++) {
+                if (nextPlayers[i].id === trade.sellerIdx) sIdx = i;
+                if (nextPlayers[i].id === trade.buyerIdx) bIdx = i;
+            }
+            if (sIdx !== -1) nextPlayers[sIdx].money += trade.price;
+            if (bIdx !== -1) nextPlayers[bIdx].money -= trade.price;
+            
+            var nextProps = cloneObj(gameData.properties);
+            nextProps[trade.sqId] = trade.buyerIdx;
+            await syncGameData({ players: nextPlayers, properties: nextProps, pendingTrade: null });
+        } else {
+            playSound('click', isMuted);
+            await syncGameData({ pendingTrade: null });
+        }
+      }
+  };
+
+  var handleThrowBwaBwei = function() { return handlersRef.current.handleThrowBwaBwei(); };
+  var handleFinishBwaBwei = function() { return handlersRef.current.handleFinishBwaBwei(); };
+  var handleBuyProperty = function() { return handlersRef.current.handleBuyProperty(); };
+  var handleEndTurn = function() { return handlersRef.current.handleEndTurn(); };
+  var handleRespondTrade = function(accept) { return handlersRef.current.handleRespondTrade(accept); };
+
+  // =========================================================
+  // FIX: MOVING 與 AI 邏輯改為相依 handlersRef 避免被 1s 計時器打斷
+  // =========================================================
   useEffect(function() {
     if (appPhase !== 'GAME' || gameData.gameState !== 'MOVING' || gameData.currentPlayerIdx !== activePlayerIndex) return;
 
@@ -1013,7 +1147,7 @@ export default function App() {
             actionMessage: msg
           });
         } else {
-          await handleLandOnSquare();
+          await handlersRef.current.handleLandOnSquare();
         }
       } catch (e) {
         console.error(e);
@@ -1021,13 +1155,53 @@ export default function App() {
     }, 350);
 
     return function() { clearTimeout(moveTimer); };
-  }, [gameData.gameState, gameData.remainingSteps, gameData.currentPlayerIdx, activePlayerIndex, isOfflineMode, appPhase, gameData.players, gameData.actionMessage, syncGameData, isMuted, handleLandOnSquare]);
+  }, [gameData.gameState, gameData.remainingSteps, gameData.currentPlayerIdx, activePlayerIndex, isOfflineMode, appPhase, gameData.players, gameData.actionMessage, syncGameData, isMuted]);
 
-  var handleThrowBwaBwei = async function() {
-    if (gameData.currentPlayerIdx !== activePlayerIndex) return;
-    playSound('bwa', isMuted); 
-    await syncGameData({ gameState: 'BWA_BWEI_ROLLING' });
-  };
+
+  useEffect(function() {
+    if (appPhase !== 'GAME' || !isOfflineMode) return;
+
+    if (gameData.pendingTrade) {
+        var buyer = getPlayerById(gameData.players, gameData.pendingTrade.buyerIdx);
+        if (buyer && buyer.isAI) {
+            var tIdTrade = setTimeout(function() { handlersRef.current.handleRespondTrade(buyer.money >= gameData.pendingTrade.price * 1.5); }, 2000);
+            return function() { clearTimeout(tIdTrade); };
+        }
+        return; 
+    }
+
+    var currAI = getPlayerById(gameData.players, gameData.currentPlayerIdx);
+    if (currAI && currAI.isAI) {
+        var tId; 
+        var gameState = gameData.gameState;
+        if (!currAI.isBankrupt || gameState === 'END_TURN') {
+            if (gameState === 'IDLE') { 
+                tId = setTimeout(function() { 
+                    if (currAI.jailRoundsLeft === -1) { syncGameData({ gameState: 'JAIL_BWA_BWEI', bwaBweiResults: [] }); } else { handlersRef.current.handleRollDice(); } 
+                }, 1200); 
+            }
+            else if (gameState === 'JAIL_BWA_BWEI') { 
+                tId = setTimeout(function() { 
+                    var bwaLen = gameData.bwaBweiResults ? gameData.bwaBweiResults.length : 0;
+                    if (bwaLen < 3) { handlersRef.current.handleThrowBwaBwei(); } else { handlersRef.current.handleFinishBwaBwei(); } 
+                }, 1200); 
+            }
+            else if (gameState === 'ACTION') { 
+                tId = setTimeout(function() {
+                    var sq = BOARD_SQUARES[currAI.pos];
+                    var hasOwner = gameData.properties && gameData.properties[sq.id] !== undefined;
+                    var cB = sq.type === 'PROPERTY' && (!hasOwner) && currAI.money >= sq.price && currAI.trust >= sq.reqTrust;
+                    if (cB && Math.random() > 0.2) { handlersRef.current.handleBuyProperty(); } else { handlersRef.current.handleEndTurn(); }
+                }, 2000); 
+            }
+            else if (gameState === 'END_TURN') { 
+                tId = setTimeout(function() { handlersRef.current.handleEndTurn(); }, 2000); 
+            }
+        }
+        return function() { clearTimeout(tId); };
+    }
+  }, [gameData.gameState, gameData.currentPlayerIdx, gameData.bwaBweiResults, gameData.pendingTrade, isOfflineMode, appPhase, gameData.players, gameData.properties, syncGameData]);
+
 
   useEffect(function() {
     if (appPhase !== 'GAME') return;
@@ -1052,62 +1226,6 @@ export default function App() {
     }
   }, [gameData.gameState, gameData.currentPlayerIdx, activePlayerIndex, gameData.bwaBweiResults, isOfflineMode, roomId, syncGameData, appPhase]);
 
-  var handleFinishBwaBwei = async function() {
-    var nextPlayers = clonePlayers(gameData.players);
-    var currP = nextPlayers[activePlayerIndex];
-    
-    var holyCount = 0;
-    var results = gameData.bwaBweiResults || [];
-    for (var i = 0; i < results.length; i++) {
-        if (results[i] === 'HOLY') holyCount++;
-    }
-    
-    var msg = '總共擲出【 ' + holyCount + ' 次聖杯 】\n';
-    if (holyCount === 3) {
-      playSound('win', isMuted); 
-      currP.jailRoundsLeft = 0;
-      currP.money -= 500;
-      currP.inJail = false;
-      msg += '✨ 神明原諒你了！(繳交罰款 $500)\n你重獲自由，下回合可正常玩囉！';
-    } else {
-      playSound('bad', isMuted); 
-      var waitRounds = 3 - holyCount; 
-      currP.jailRoundsLeft = waitRounds;
-      msg += '神明要你繼續反省...\n需在泡泡裡等待 ' + waitRounds + ' 輪。';
-    }
-    
-    await syncGameData({
-      players: nextPlayers,
-      gameState: 'END_TURN', 
-      actionMessage: msg,
-      bwaBweiResults: [] 
-    });
-  };
-
-  var handleBuyProperty = async function() {
-    try {
-      var player = getPlayerById(gameData.players, activePlayerIndex);
-      if (!player) return;
-      var sq = BOARD_SQUARES[player.pos];
-      
-      if (myMoney >= reqMoney && myTrust >= reqTrust) {
-        playSound('coin', isMuted); 
-        var nextPlayers = clonePlayers(gameData.players);
-        nextPlayers[activePlayerIndex].money -= reqMoney;
-
-        var nextProps = cloneObj(gameData.properties);
-        nextProps[sq.id] = player.id;
-
-        await syncGameData({
-          players: nextPlayers,
-          properties: nextProps,
-          gameState: 'END_TURN',
-          actionMessage: '🎉 成功買下 ' + sq.name + ' 囉！'
-        });
-      }
-    } catch(e) { }
-  };
-
   var handleSellToBank = useCallback(async function(sqId, price) {
     playSound('coin', isMuted); 
     var nextPlayers = clonePlayers(gameData.players);
@@ -1126,156 +1244,6 @@ export default function App() {
     setSellProcess(null);
     setShowAssetManager(false);
   }, [activePlayerIndex, isMuted, syncGameData]);
-
-  var handleRespondTrade = useCallback(async function(accept) {
-    if (!gameData.pendingTrade) return;
-    var trade = gameData.pendingTrade;
-    if (accept) {
-        playSound('coin', isMuted);
-        var nextPlayers = clonePlayers(gameData.players);
-        var sIdx = -1;
-        var bIdx = -1;
-        for (var i = 0; i < nextPlayers.length; i++) {
-            if (nextPlayers[i].id === trade.sellerIdx) sIdx = i;
-            if (nextPlayers[i].id === trade.buyerIdx) bIdx = i;
-        }
-        if (sIdx !== -1) nextPlayers[sIdx].money += trade.price;
-        if (bIdx !== -1) nextPlayers[bIdx].money -= trade.price;
-        
-        var nextProps = cloneObj(gameData.properties);
-        nextProps[trade.sqId] = trade.buyerIdx;
-        
-        await syncGameData({ players: nextPlayers, properties: nextProps, pendingTrade: null });
-    } else {
-        playSound('click', isMuted);
-        await syncGameData({ pendingTrade: null });
-    }
-  }, [gameData.players, gameData.properties, gameData.pendingTrade, isMuted, syncGameData]);
-
-  var handleMortgageTrust = async function() {
-     try {
-         var player = getPlayerById(gameData.players, activePlayerIndex);
-         if (!player || player.trust <= 1) return; 
-         playSound('coin', isMuted); 
-
-         var exchangeRate = player.trust >= 10 ? 1000 : 500;
-         var nextPlayers = clonePlayers(gameData.players);
-         nextPlayers[activePlayerIndex].trust -= 1;
-         nextPlayers[activePlayerIndex].money += exchangeRate;
-         await syncGameData({ players: nextPlayers });
-     } catch(e) {}
-  };
-
-  var handleEndTurn = async function() {
-    try {
-      playSound('click', isMuted); 
-      var nextPlayers = clonePlayers(gameData.players);
-      var nextIdx = gameData.currentPlayerIdx;
-      
-      var attempts = 0;
-      do {
-          nextIdx = (nextIdx + 1) % nextPlayers.length;
-          attempts++;
-      } while (nextPlayers[nextIdx].isBankrupt && attempts < 10);
-
-      var nextPlayerClone = nextPlayers[nextIdx];
-      var nextState = 'IDLE';
-      var msg = '';
-
-      if (nextPlayerClone.inJail && nextPlayerClone.jailRoundsLeft > 0) {
-          nextPlayerClone.jailRoundsLeft -= 1;
-          if (nextPlayerClone.jailRoundsLeft === 0) {
-              nextPlayerClone.money -= 500;
-              nextPlayerClone.inJail = false;
-              msg = '🌟 ' + nextPlayerClone.name + ' 反省期滿，扣除罰金 $500。\n離開反省泡泡，可正常行動囉！';
-          } else {
-              nextState = 'END_TURN'; 
-              msg = '🔒 ' + nextPlayerClone.name + ' 仍在反省泡泡中...\n(還要等 ' + nextPlayerClone.jailRoundsLeft + ' 輪喔)';
-          }
-      }
-
-      var bkResult = checkBankruptcy(nextPlayers);
-      var bankruptPlayers = bkResult.newPlayers;
-
-      if (bankruptPlayers[nextIdx].isBankrupt && nextPlayerClone.inJail === false) {
-          msg += '\n🚨 資金或信用歸零，宣告破產！';
-          nextState = 'END_TURN';
-      }
-
-      var activeCount = 0;
-      var aliveCount = 0;
-      for (var i = 0; i < bankruptPlayers.length; i++) {
-          var bp = bankruptPlayers[i];
-          if (isOfflineMode || bp.uid !== null) {
-              activeCount++;
-              if (!bp.isBankrupt) aliveCount++;
-          }
-      }
-      
-      if (activeCount > 1 && aliveCount <= 1) nextState = 'GAME_OVER';
-
-      var nextProps = Object.assign({}, gameData.properties);
-      if (bkResult.changed) {
-          var bankruptIds = [];
-          for (var j = 0; j < bankruptPlayers.length; j++) {
-              if (bankruptPlayers[j].isBankrupt) bankruptIds.push(bankruptPlayers[j].id);
-          }
-          nextProps = clearBankruptProperties(gameData.properties, bankruptIds);
-      }
-
-      await syncGameData({
-        players: bankruptPlayers,
-        properties: nextProps,
-        currentPlayerIdx: nextIdx,
-        gameState: nextState,
-        actionMessage: msg
-      });
-    } catch(e) { console.error(e); }
-  };
-
-  useEffect(function() {
-    if (appPhase !== 'GAME' || !isOfflineMode) return;
-
-    if (gameData.pendingTrade) {
-        var buyer = getPlayerById(gameData.players, gameData.pendingTrade.buyerIdx);
-        if (buyer && buyer.isAI) {
-            var tIdTrade = setTimeout(function() { handleRespondTrade(buyer.money >= gameData.pendingTrade.price * 1.5); }, 2000);
-            return function() { clearTimeout(tIdTrade); };
-        }
-        return; 
-    }
-
-    var currAI = getPlayerById(gameData.players, gameData.currentPlayerIdx);
-    if (currAI && currAI.isAI) {
-        var tId; 
-        var gameState = gameData.gameState;
-        if (!currAI.isBankrupt || gameState === 'END_TURN') {
-            if (gameState === 'IDLE') { 
-                tId = setTimeout(function() { 
-                    if (currAI.jailRoundsLeft === -1) { syncGameData({ gameState: 'JAIL_BWA_BWEI', bwaBweiResults: [] }); } else { handleRollDice(); } 
-                }, 1200); 
-            }
-            else if (gameState === 'JAIL_BWA_BWEI') { 
-                tId = setTimeout(function() { 
-                    var bwaLen = gameData.bwaBweiResults ? gameData.bwaBweiResults.length : 0;
-                    if (bwaLen < 3) { handleThrowBwaBwei(); } else { handleFinishBwaBwei(); } 
-                }, 1200); 
-            }
-            else if (gameState === 'ACTION') { 
-                tId = setTimeout(function() {
-                    var sq = BOARD_SQUARES[currAI.pos];
-                    var hasOwner = gameData.properties && gameData.properties[sq.id] !== undefined;
-                    var cB = sq.type === 'PROPERTY' && (!hasOwner) && currAI.money >= sq.price && currAI.trust >= sq.reqTrust;
-                    if (cB && Math.random() > 0.2) { handleBuyProperty(); } else { handleEndTurn(); }
-                }, 2000); 
-            }
-            else if (gameState === 'END_TURN') { 
-                tId = setTimeout(function() { handleEndTurn(); }, 2000); 
-            }
-        }
-        return function() { clearTimeout(tId); };
-    }
-  }, [gameData.gameState, gameData.currentPlayerIdx, gameData.bwaBweiResults, gameData.pendingTrade, isOfflineMode, appPhase, gameData.players, gameData.properties, handleBuyProperty, handleEndTurn, handleFinishBwaBwei, handleRespondTrade, handleRollDice, handleThrowBwaBwei, syncGameData]);
 
   // -------------------------------------------------------------
   // UI 渲染區塊
@@ -1728,8 +1696,8 @@ export default function App() {
                     <h2 className="text-3xl font-black text-slate-700">🤝 產權購買邀請</h2>
                     <p className="text-xl text-slate-500 leading-relaxed font-black">玩家 <span className="text-amber-600">{gameData.players[gameData.pendingTrade.sellerIdx].name}</span> <br/>想以 <span className="text-emerald-500 font-black">${gameData.pendingTrade.price}</span> 出售 <br/><span className="text-sky-600 font-black">{BOARD_SQUARES[gameData.pendingTrade.sqId].name}</span> 給 <span className="text-emerald-600">{tradeBuyer ? tradeBuyer.name : ''}</span>！</p>
                     <div className="flex gap-4 w-full">
-                       <button onClick={handleRespondTradeFalse} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl border-4 border-white shadow-md font-black text-xl active:scale-95 transition-all">婉拒</button>
-                       <button disabled={tradeBuyerMoney < gameData.pendingTrade.price} onClick={handleRespondTradeTrue} className={`flex-1 py-4 rounded-2xl border-4 border-white shadow-lg font-black text-xl active:translate-y-1 transition-all ${tradeBuyerMoney >= gameData.pendingTrade.price ? 'bg-emerald-400 text-white shadow-[0_6px_0_0_#10b981]' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                       <button onClick={function(){ handleRespondTrade(false); }} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl border-4 border-white shadow-md font-black text-xl active:scale-95 transition-all">婉拒</button>
+                       <button disabled={tradeBuyerMoney < gameData.pendingTrade.price} onClick={function(){ handleRespondTrade(true); }} className={`flex-1 py-4 rounded-2xl border-4 border-white shadow-lg font-black text-xl active:translate-y-1 transition-all ${tradeBuyerMoney >= gameData.pendingTrade.price ? 'bg-emerald-400 text-white shadow-[0_6px_0_0_#10b981]' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                          {tradeBuyerMoney < gameData.pendingTrade.price ? '資金不足' : '收購！'}
                        </button>
                     </div>
