@@ -11,7 +11,7 @@ import { getFirestore, doc, setDoc, onSnapshot, updateDoc, getDoc } from 'fireba
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 
 // =========================================================
-// 1. 全域常數與純函數 (安全放置於頂部，杜絕 ReferenceError)
+// 1. 全域常數與純函數
 // =========================================================
 const BASE_MONEY = 17200; 
 const BASE_TRUST = 10; 
@@ -105,7 +105,7 @@ const checkBankruptcy = (players) => {
       changed = true;
       return { ...p, isBankrupt: true };
     }
-    return { ...p };
+    return p;
   });
   return { changed, newPlayers };
 };
@@ -120,25 +120,30 @@ const clearBankruptProperties = (props, bankruptPlayerIds) => {
   return newProps;
 };
 
+const getOwnerBodyClass = (colorClass) => {
+  const map = {
+    'bg-sky-300': 'bg-sky-100', 'bg-rose-300': 'bg-rose-100', 'bg-emerald-300': 'bg-emerald-100',
+    'bg-purple-300': 'bg-purple-100', 'bg-orange-300': 'bg-orange-100', 'bg-pink-300': 'bg-pink-100',
+  };
+  return map[colorClass] || 'bg-slate-100';
+};
+
+const getOwnerBorderClass = (colorClass) => {
+  const map = {
+    'bg-sky-300': 'border-sky-300', 'bg-rose-300': 'border-rose-300', 'bg-emerald-300': 'border-emerald-300',
+    'bg-purple-300': 'border-purple-300', 'bg-orange-300': 'border-orange-300', 'bg-pink-300': 'border-pink-300',
+  };
+  return map[colorClass] || 'border-slate-300';
+};
+
 // =========================================================
 // 2. Firebase 初始化
 // =========================================================
 const getFirebaseConfig = () => {
   try {
-    if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-      return JSON.parse(__firebase_config);
-    }
-  } catch (e) {
-    console.warn("使用預設金鑰");
-  }
-  return {
-    apiKey: "AIzaSyBNN-5xswc1tq_Y5ymWMVGFldZRfpvsVZM",
-    authDomain: "da-xin-wong.firebaseapp.com",
-    projectId: "da-xin-wong",
-    storageBucket: "da-xin-wong.appspot.com",
-    messagingSenderId: "72871979370",
-    appId: "1:72871979370:web:97caab1074d5f1e8f9dd13"
-  };
+    if (typeof __firebase_config !== 'undefined' && __firebase_config) return JSON.parse(__firebase_config);
+  } catch (e) { console.warn("使用預設金鑰"); }
+  return { apiKey: "AIzaSyBNN-5xswc1tq_Y5ymWMVGFldZRfpvsVZM", authDomain: "da-xin-wong.firebaseapp.com", projectId: "da-xin-wong", storageBucket: "da-xin-wong.appspot.com", messagingSenderId: "72871979370", appId: "1:72871979370:web:97caab1074d5f1e8f9dd13" };
 };
 
 const firebaseConfig = getFirebaseConfig();
@@ -147,7 +152,6 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
 
-// 🌟 Web Audio API 音效
 let audioCtx = null;
 const playSound = (type, isMuted) => {
   if (isMuted || typeof window === 'undefined') return;
@@ -175,35 +179,13 @@ const playSound = (type, isMuted) => {
     case 'bwa':
       osc.type = 'square'; osc.frequency.setValueAtTime(150, now); gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05); osc.start(now); osc.stop(now + 0.05); break;
     case 'roll':
-      for(let i=0; i<6; i++) { 
-          const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); 
-          o.connect(g); g.connect(audioCtx.destination); o.type = 'triangle'; 
-          o.frequency.setValueAtTime(300 + Math.random()*300, now + i*0.08); 
-          g.gain.setValueAtTime(0.1, now + i*0.08); g.gain.exponentialRampToValueAtTime(0.01, now + i*0.08 + 0.05); 
-          o.start(now + i*0.08); o.stop(now + i*0.08 + 0.05); 
-      } break;
+      for(let i=0; i<6; i++) { const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.type = 'triangle'; o.frequency.setValueAtTime(300 + Math.random()*300, now + i*0.08); g.gain.setValueAtTime(0.1, now + i*0.08); g.gain.exponentialRampToValueAtTime(0.01, now + i*0.08 + 0.05); o.start(now + i*0.08); o.stop(now + i*0.08 + 0.05); } break;
     default: break;
   }
 };
 
-const getOwnerBodyClass = (colorClass) => {
-  const map = {
-    'bg-sky-300': 'bg-sky-100', 'bg-rose-300': 'bg-rose-100', 'bg-emerald-300': 'bg-emerald-100',
-    'bg-purple-300': 'bg-purple-100', 'bg-orange-300': 'bg-orange-100', 'bg-pink-300': 'bg-pink-100',
-  };
-  return map[colorClass] || 'bg-slate-100';
-};
-
-const getOwnerBorderClass = (colorClass) => {
-  const map = {
-    'bg-sky-300': 'border-sky-300', 'bg-rose-300': 'border-rose-300', 'bg-emerald-300': 'border-emerald-300',
-    'bg-purple-300': 'border-purple-300', 'bg-orange-300': 'border-orange-300', 'bg-pink-300': 'border-pink-300',
-  };
-  return map[colorClass] || 'border-slate-300';
-};
-
 // =========================================================
-// 3. UI 顯示輔助組件 
+// 3. UI 獨立組件
 // =========================================================
 const DiceIcon = ({ value, className, style, strokeWidth }) => {
   const val = value || 1;
@@ -235,8 +217,469 @@ const BweiBlock = ({ isFlat, className = "" }) => {
   );
 };
 
+const LandingScreen = ({ setupMode, setSetupMode, setupPlayerCount, setSetupPlayerCount, setupTimeLimit, setSetupTimeLimit, setupAvatar, setSetupAvatar, setupName, setSetupName, localNames, setLocalNames, localPlayerTypes, setLocalPlayerTypes, localAvatars, setLocalAvatars, editingLocalPlayer, setEditingLocalPlayer, user, roomId, setRoomId, errorMsg, handleStartLocalGame, handleCreateRoom, handleJoinRoom }) => (
+  <div className="min-h-screen w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-4 md:p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
+    <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }`}</style>
+    <div className="absolute top-10 left-10 w-32 h-32 bg-white/40 rounded-full blur-xl animate-pulse" />
+    <div className="absolute bottom-20 right-20 w-48 h-48 bg-pink-300/20 rounded-full blur-2xl animate-pulse delay-700" />
+    <h1 className="text-5xl md:text-[4.5rem] font-black mb-4 md:mb-6 text-sky-500 tracking-widest drop-shadow-[0_6px_0_rgba(2,132,199,0.2)] text-center leading-tight">大信翁<span className="block text-xl md:text-2xl text-rose-400 mt-1 tracking-normal">Candy Bubble Edition 🍬</span></h1>
+    {errorMsg && <div className="mb-4 bg-rose-100 text-rose-700 p-3 rounded-2xl border-4 border-rose-300 shadow-sm">{String(errorMsg)}</div>}
+    <div className={`bg-white/90 backdrop-blur-md border-[6px] border-sky-200 p-6 md:p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] w-full transition-all duration-300 relative z-10 ${setupMode === 'INIT' ? 'max-w-md flex flex-col items-center gap-5' : 'max-w-4xl flex flex-col'}`}>
+      {setupMode === 'INIT' && (
+        <div className="flex flex-col gap-4 w-full">
+          <button onClick={() => setSetupMode('LOCAL')} className="py-4 md:py-5 rounded-[2rem] text-2xl md:text-3xl bg-amber-400 text-amber-900 border-[6px] border-white shadow-[0_6px_0_0_#d97706,0_10px_15px_rgba(0,0,0,0.1)] hover:-translate-y-1 hover:bg-amber-300 active:border-b-[0px] active:translate-y-[6px] active:shadow-none transition-all relative overflow-hidden group">單機同樂 🎪 <span className="text-sm block font-bold text-amber-800/70 mt-1">大家一起圍著螢幕玩</span></button>
+          <div className="flex items-center gap-4 my-1 opacity-40"><div className="flex-1 h-1.5 bg-sky-200 rounded-full" /><span className="font-black text-sky-800 text-sm tracking-widest">線上模式</span><div className="flex-1 h-1.5 bg-sky-200 rounded-full" /></div>
+          <button disabled={!user} onClick={() => setSetupMode('CREATE')} className={`py-4 rounded-[2rem] text-xl md:text-2xl border-[5px] border-white shadow-[0_5px_0_0_#0ea5e9,0_8px_10px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[5px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_5px_0_0_#cbd5e1]' : 'bg-sky-400 text-sky-900 hover:bg-sky-300'}`}>{user ? "創建連線房間 🏠" : "雲端連線中..."}</button>
+          <button disabled={!user} onClick={() => setSetupMode('JOIN')} className={`py-4 rounded-[2rem] text-xl md:text-2xl border-[5px] border-white shadow-[0_5px_0_0_#10b981,0_8px_10px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[5px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_5px_0_0_#cbd5e1]' : 'bg-emerald-400 text-emerald-900 hover:bg-emerald-300'}`}>加入好友房間 🚀</button>
+        </div>
+      )}
+      {(setupMode === 'LOCAL' || setupMode === 'CREATE') && (
+        <div className="w-full flex flex-col items-center gap-4 animate-in zoom-in-95 duration-300">
+          <div className="flex flex-col md:flex-row w-full gap-6">
+            <div className="flex-1 flex flex-col justify-center gap-4">
+              <div className="w-full">
+                <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><UsersIcon size={20} /> 幾個人一起玩呢？</div>
+                <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+                  {[2, 3, 4, 5, 6].map(num => <button key={num} onClick={() => setSetupPlayerCount(num)} className={`w-12 h-12 md:w-14 md:h-14 rounded-full text-xl md:text-2xl transition-all border-4 border-white ${setupPlayerCount === num ? 'bg-amber-400 text-amber-900 scale-110 shadow-[0_4px_0_0_#d97706]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>{num}</button>)}
+                </div>
+              </div>
+              <div className="w-full border-t-[3px] border-dashed border-sky-100" />
+              <div className="w-full">
+                <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><Clock size={20} /> 玩多久呢？</div>
+                <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+                  {[{ l: '5 分', v: 300 }, { l: '10 分', v: 600 }, { l: '20 分', v: 1200 }, { l: '不限時', v: -1 }].map(t => <button key={t.v} onClick={() => setSetupTimeLimit(t.v)} className={`px-4 py-2 md:px-5 md:py-3 rounded-[1.5rem] transition-all border-4 border-white text-sm md:text-base ${setupTimeLimit === t.v ? 'bg-pink-400 text-pink-900 shadow-[0_4px_0_0_#db2777]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>{t.l}</button>)}
+                </div>
+              </div>
+            </div>
+            <div className="flex-[1.2] flex flex-col">
+              {setupMode === 'LOCAL' ? (
+                <div className="w-full bg-sky-50 rounded-[2rem] p-4 md:p-5 border-4 border-white shadow-sm h-full flex flex-col">
+                  <div className="text-center text-sky-800 mb-2 md:mb-3 text-base md:text-lg">幫角色取名字＆換頭像吧！👇</div>
+                  <div className="flex flex-wrap justify-center gap-2 md:gap-3 mb-3 md:mb-4">
+                    {Array.from({ length: setupPlayerCount }).map((_, i) => (
+                      <div key={i} className="flex flex-col items-center gap-1 md:gap-2">
+                        <button onClick={() => setEditingLocalPlayer(i)} className={`w-10 h-10 md:w-12 md:h-12 rounded-full text-2xl md:text-3xl flex items-center justify-center bg-white transition-all border-4 ${editingLocalPlayer === i ? 'border-amber-400 scale-125 shadow-lg z-10 relative' : 'border-sky-200 opacity-70 hover:opacity-100 hover:scale-110'}`}>{localAvatars[i]}</button>
+                        <span className="text-[10px] md:text-xs text-sky-600 bg-white px-2 py-0.5 rounded-full border-2 border-sky-100 max-w-[60px] truncate">{localNames[i]}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-center mt-2 mb-3">
+                    <button onClick={() => { const n = [...localPlayerTypes]; n[editingLocalPlayer] = n[editingLocalPlayer] === 'HUMAN' ? 'AI' : 'HUMAN'; setLocalPlayerTypes(n); }} className={`px-4 py-1.5 rounded-full border-[3px] text-sm md:text-base font-black transition-all shadow-sm flex items-center gap-1 ${localPlayerTypes[editingLocalPlayer] === 'AI' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-emerald-100 border-emerald-300 text-emerald-700'}`}>
+                      {localPlayerTypes[editingLocalPlayer] === 'AI' ? '🤖 電腦控制' : '🧑 玩家控制'}
+                    </button>
+                  </div>
+                  <div className="mb-3 w-full max-w-[200px] mx-auto">
+                    <input type="text" value={localNames[editingLocalPlayer]} onChange={e => { const n = [...localNames]; n[editingLocalPlayer] = e.target.value.substring(0, 6); setLocalNames(n); }} placeholder={`玩家 ${editingLocalPlayer + 1} 名字`} className="w-full bg-white px-3 py-2 rounded-xl text-center text-sm md:text-base font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors" />
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2 max-h-24 md:max-h-32 overflow-y-auto p-2 bg-white rounded-[1.5rem] border-2 border-sky-100 custom-scrollbar mt-auto">
+                    {CHILD_AVATARS.map(avatar => {
+                      const tIdx = editingLocalPlayer < setupPlayerCount ? editingLocalPlayer : 0;
+                      return <button key={avatar} onClick={() => { const nA = [...localAvatars]; nA[tIdx] = avatar; setLocalAvatars(nA); }} className={`w-10 h-10 md:w-12 md:h-12 rounded-full text-2xl md:text-3xl flex items-center justify-center transition-all ${localAvatars[tIdx] === avatar ? 'bg-amber-100 border-4 border-amber-400 scale-110' : 'bg-slate-50 border-2 border-transparent hover:bg-sky-100'}`}>{avatar}</button>;
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full bg-sky-50 rounded-[2rem] p-5 md:p-6 border-4 border-white shadow-sm h-full flex flex-col justify-center">
+                  <div className="text-center text-sky-800 mb-2 md:mb-3 text-lg md:text-xl">你的專屬角色與名字！</div>
+                  <div className="mb-4 w-full max-w-[200px] mx-auto">
+                    <input type="text" value={setupName} onChange={e => setSetupName(e.target.value.substring(0, 6))} placeholder="輸入你的名字" className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors" />
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2 md:gap-3 max-h-36 md:max-h-48 overflow-y-auto p-2 custom-scrollbar">
+                    {CHILD_AVATARS.map(avatar => <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-12 h-12 md:w-16 md:h-16 rounded-full text-3xl md:text-4xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}>{avatar}</button>)}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex w-full gap-3 md:gap-4 mt-2 max-w-lg mx-auto">
+            <button onClick={() => setSetupMode('INIT')} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
+            <button onClick={setupMode === 'LOCAL' ? handleStartLocalGame : handleCreateRoom} className="flex-[2] py-3 md:py-4 text-white bg-emerald-400 rounded-[2rem] shadow-[0_5px_0_0_#10b981] hover:-translate-y-1 active:translate-y-[5px] active:shadow-none active:border-b-0 transition-all text-xl md:text-2xl border-[4px] border-white">出發囉！✨</button>
+          </div>
+        </div>
+      )}
+      {setupMode === 'JOIN' && (
+        <div className="w-full flex flex-col items-center gap-5 animate-in zoom-in-95 duration-300">
+          <div className="flex flex-col md:flex-row w-full gap-6">
+            <div className="flex-1 flex flex-col justify-center gap-5">
+              <div className="w-full">
+                <div className="text-center text-sky-700 mb-3 text-lg md:text-xl">請輸入房間密碼 🔑</div>
+                <input type="text" placeholder="A1B2C3" value={roomId} onChange={e => setRoomId(e.target.value.toUpperCase())} className="w-full bg-white p-4 md:p-5 rounded-[2rem] text-center text-3xl md:text-4xl font-black border-[4px] border-sky-200 focus:border-amber-400 outline-none uppercase tracking-widest text-[#4a3424] shadow-inner" />
+              </div>
+            </div>
+            <div className="flex-[1.2] flex flex-col">
+              <div className="w-full bg-sky-50 rounded-[2rem] p-5 border-4 border-white shadow-sm h-full flex flex-col justify-center">
+                <div className="text-center text-sky-800 mb-2 md:mb-3 text-lg md:text-xl">你的專屬角色與名字！</div>
+                <div className="mb-4 w-full max-w-[200px] mx-auto">
+                  <input type="text" value={setupName} onChange={e => setSetupName(e.target.value.substring(0, 6))} placeholder="輸入你的名字" className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors" />
+                </div>
+                <div className="flex flex-wrap justify-center gap-2 md:gap-3 max-h-36 overflow-y-auto p-2 custom-scrollbar">
+                  {CHILD_AVATARS.map(avatar => <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-12 h-12 md:w-16 md:h-16 rounded-full text-3xl md:text-4xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}>{avatar}</button>)}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex w-full gap-3 md:gap-4 mt-2 max-w-lg mx-auto">
+            <button onClick={() => setSetupMode('INIT')} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
+            <button disabled={roomId.length < 4} onClick={handleJoinRoom} className={`flex-[2] py-3 md:py-4 text-white rounded-[2rem] transition-all text-xl md:text-2xl border-[4px] border-white ${roomId.length < 4 ? 'bg-slate-300 border-slate-200' : 'bg-sky-400 shadow-[0_5px_0_0_#0ea5e9] hover:-translate-y-1 active:translate-y-[5px] active:shadow-none active:border-b-0'}`}>加入房間 🚀</button>
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+const GameOverScreen = ({ gameData }) => {
+  const ranked = [...gameData.players].sort((a, b) => b.trust !== a.trust ? b.trust - a.trust : b.money - a.money);
+  return (
+    <div className="min-h-screen w-screen bg-[#fff8e7] flex flex-col items-center justify-center p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
+      <PartyPopper size={120} className="text-pink-400 mb-6 animate-bounce drop-shadow-md" />
+      <h1 className="text-[5rem] font-black mb-10 text-amber-500 drop-shadow-[0_6px_0_rgba(217,119,6,0.2)]">遊戲結束囉！🎉</h1>
+      <div className="bg-white p-10 rounded-[3rem] w-full max-w-xl shadow-[0_20px_50px_rgba(0,0,0,0.05)] border-[8px] border-amber-200 relative">
+          <h2 className="text-3xl font-black mb-8 text-amber-600 border-b-4 border-dashed border-amber-100 pb-6 text-center">🏆 大信翁排行榜 🏆</h2>
+          {ranked.map((p, i) => (
+              <div key={p.id} className={`flex items-center justify-between p-5 mb-4 rounded-[2rem] border-4 ${i === 0 ? 'bg-amber-50 border-amber-400 shadow-md scale-105 relative z-10' : 'bg-slate-50 border-slate-200'}`}>
+                  {i === 0 && <div className="absolute -top-4 -left-4 text-4xl animate-bounce">👑</div>}
+                  <div className="flex items-center gap-5">
+                      <span className={`font-black text-3xl ${i === 0 ? 'text-amber-500' : 'text-slate-400'}`}>#{i+1}</span>
+                      <div className="text-5xl bg-white p-2 rounded-full shadow-sm border-2 border-slate-100">{p.icon}</div>
+                      <span className="font-black text-2xl text-slate-700">{p.name} {p.isBankrupt && <span className="text-sm text-red-400 ml-1">(出局)</span>}</span>
+                  </div>
+                  <div className="text-right">
+                      <div className="text-amber-500 font-black text-2xl flex items-center justify-end gap-1"><Star size={24} fill="currentColor" /> {p.trust} 點</div>
+                      <div className="text-emerald-500 font-black text-lg">💰 ${p.money}</div>
+                  </div>
+              </div>
+          ))}
+      </div>
+      <button onClick={() => window.location.reload()} className="mt-10 px-10 py-5 bg-sky-400 text-sky-900 rounded-[2.5rem] font-black text-2xl shadow-[0_8px_0_0_#0ea5e9] border-[6px] border-white hover:-translate-y-1 active:translate-y-[8px] active:shadow-none transition-all">再玩一次！</button>
+    </div>
+  );
+};
+
+const TopBar = ({ localTimeLeft, isOfflineMode, roomId, gameData }) => (
+  <div className="absolute top-6 left-6 right-24 z-[150] flex gap-4 overflow-x-auto pb-6 px-2 pointer-events-auto items-center custom-scrollbar">
+    <div className="bg-white text-rose-500 rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center shadow-md h-[75px] shrink-0 border-4 border-rose-200">
+      <Timer size={20} className={localTimeLeft < 60 && localTimeLeft > 0 ? "animate-pulse" : ""} /> 
+      <span className="text-xl font-black mt-1">{formatTime(localTimeLeft)}</span>
+    </div>
+    <div className={`bg-white rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center font-black shadow-md h-[75px] shrink-0 border-4 tracking-wider ${isOfflineMode ? 'border-emerald-300 text-emerald-700' : 'border-sky-300 text-sky-700'}`}>
+      <div className="text-xs opacity-70">{isOfflineMode ? '模式' : '房號'}</div>
+      <div className="text-xl mt-1">{isOfflineMode ? '單機同樂 🎪' : roomId}</div>
+    </div>
+    <div className="w-1.5 h-10 bg-sky-200/50 mx-2 rounded-full shrink-0" />
+    {gameData.players.map(p => {
+      const isCurrent = gameData.currentPlayerIdx === p.id;
+      return (
+        <div key={p.id} className={`flex items-center gap-3 px-5 py-2.5 rounded-[2.5rem] border-4 shadow-sm h-[75px] shrink-0 transition-all duration-300 ${isCurrent ? 'border-amber-400 bg-amber-50 scale-110 z-10 shadow-[0_5px_15px_rgba(217,119,6,0.2)]' : 'border-white bg-white/80 opacity-90'} ${p.isBankrupt ? 'grayscale opacity-50' : ''}`}>
+          <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center text-4xl shadow-sm bg-white border-4 border-slate-100 relative">
+              {p.icon}
+              {p.inJail && !p.isBankrupt && <div className="absolute -top-2 -right-2 text-base animate-bounce drop-shadow-md">🙏</div>}
+          </div>
+          <div className="flex flex-col justify-center min-w-[85px]">
+              <div className="text-[14px] text-slate-500 flex justify-between items-center leading-none mb-1.5"><span className={isCurrent ? "text-amber-700" : "text-slate-600"}>{p.name}</span></div>
+              {p.uid !== null && !p.isBankrupt ? (
+                  <div className="flex gap-2 items-end leading-none">
+                      <span className={`text-[1.1rem] ${p.money < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>${p.money}</span>
+                      <span className={`text-[13px] flex items-center gap-0.5 ${p.trust <= 0 ? 'text-rose-500' : 'text-amber-500'}`}><Star size={12} fill="currentColor" />{p.trust}</span>
+                  </div>
+              ) : (<span className="text-sm text-slate-400 italic mt-1">{p.isBankrupt ? '出局 🥺' : '等待中...'}</span>)}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+);
+
+const SquareDetailsModal = ({ selectedSquareInfo, setSelectedSquareInfo, gameData }) => {
+  if (selectedSquareInfo === null) return null;
+  const sq = BOARD_SQUARES[selectedSquareInfo];
+  const ownerId = gameData.properties?.[sq.id];
+  const owner = ownerId !== undefined ? gameData.players.find(p => p.id === ownerId) : null;
+  const rentPrice = Math.floor(sq.price * 0.4);
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setSelectedSquareInfo(null)}>
+      <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 w-full max-w-sm animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative" onClick={e => e.stopPropagation()}>
+        <button onClick={() => setSelectedSquareInfo(null)} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3} /></button>
+        <div className={`w-full h-20 rounded-[1.5rem] mb-5 ${sq.color || 'bg-slate-200'} border-4 border-white shadow-sm flex items-center justify-center text-4xl`}>
+          {sq.type === 'START' && '✨'}{sq.type === 'TAX' && '💸'}{sq.type === 'JAIL' && '🙏'}
+          {sq.type === 'CHANCE_GOOD' && '🍀'}{sq.type === 'CHANCE_BAD' && '⛈️'}{sq.type === 'PROPERTY' && '🏠'}
+        </div>
+        <h2 className="text-3xl font-black text-slate-700 text-center mb-2 drop-shadow-sm">{sq.name}</h2>
+        <div className="text-center text-slate-400 mb-6 text-lg">{sq.desc || (sq.type === 'PROPERTY' ? '一塊棒棒的地產 🌟' : '特殊泡泡 🫧')}</div>
+        {sq.type === 'PROPERTY' && (
+          <div className="flex flex-col gap-3 w-full">
+            <div className="flex justify-between items-center bg-sky-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm">
+              <span className="text-sky-800 text-lg">購買需要</span><span className="font-black text-sky-600 text-2xl">${sq.price}</span>
+            </div>
+            <div className="flex justify-between items-center bg-rose-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm">
+              <span className="text-rose-800 text-lg">過路費</span><span className="font-black text-rose-500 text-2xl">${rentPrice}</span>
+            </div>
+            <div className="flex justify-between items-center bg-amber-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm">
+              <span className="text-amber-800 text-lg">信用門檻</span><span className="font-black text-amber-500 text-2xl flex items-center gap-1"><Star size={24} fill="currentColor" /> {sq.reqTrust}</span>
+            </div>
+            <div className="mt-4 p-5 rounded-[2rem] border-[4px] border-dashed border-slate-200 text-center bg-slate-50 relative overflow-hidden">
+              <div className="text-slate-400 mb-2 text-sm">這塊地的主人是誰呢？</div>
+              {owner ? (
+                <div className="font-black text-3xl flex items-center justify-center gap-3"><span className="text-5xl drop-shadow-md">{owner.icon}</span> <span className="text-emerald-600">{owner.name}</span></div>
+              ) : (<div className="font-black text-slate-300 text-2xl py-2">目前沒有主人喔 🥺</div>)}
+            </div>
+          </div>
+        )}
+        {(sq.type === 'TAX' || sq.type === 'START') && (
+          <div className={`flex justify-between items-center p-6 rounded-[2rem] border-4 w-full mt-2 shadow-sm ${sq.type === 'TAX' ? 'bg-rose-100 border-white' : 'bg-emerald-100 border-white'}`}>
+            <span className={`text-2xl ${sq.type === 'TAX' ? 'text-rose-800' : 'text-emerald-800'}`}>{sq.type === 'TAX' ? '要繳交 💸' : '可領取 💰'}</span>
+            <span className={`font-black text-4xl ${sq.type === 'TAX' ? 'text-rose-500' : 'text-emerald-500'}`}>${sq.amount || 500}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AssetManagerModal = ({ showAssetManager, setShowAssetManager, myPlayer, myProperties, sellProcess, setSellProcess, handleMortgageTrust, handleSellToBank, initiatePlayerTrade, gameData, isOfflineMode, activePlayerIndex }) => {
+  if (!showAssetManager || !myPlayer) return null;
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => { setShowAssetManager(false); setSellProcess(null); }}>
+      <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-amber-100 w-[92vw] max-w-md relative pt-14 shadow-2xl animate-in zoom-in-95 font-black" onClick={e=>e.stopPropagation()}>
+          <button onClick={() => { setShowAssetManager(false); setSellProcess(null); }} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3} /></button>
+          {!sellProcess ? (
+             <>
+              <div className="flex flex-col items-center border-b-4 border-dashed border-amber-100 pb-4 mb-4">
+                  <div className="w-16 h-16 bg-amber-50 rounded-full border-4 border-amber-200 flex items-center justify-center text-4xl mb-2 shadow-inner">💼</div>
+                  <h3 className="font-black text-2xl text-amber-700">小金庫與資產</h3>
+                  {isOfflineMode && <div className="text-amber-500 text-base mt-1">({myPlayer.name} 的包包)</div>}
+              </div>
+              <div className="flex gap-3 mb-5">
+                 <div className="flex-1 bg-emerald-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm flex flex-col items-center relative overflow-hidden">
+                    <div className="absolute -right-2 -bottom-4 text-[4rem] opacity-10">💰</div>
+                    <div className="text-emerald-800 font-bold text-sm mb-1 z-10">目前資金</div>
+                    <div className="font-black text-2xl text-emerald-500 z-10">${myPlayer.money}</div>
+                 </div>
+                 <div className="flex-1 bg-amber-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm flex flex-col items-center relative overflow-hidden">
+                    <div className="absolute -right-2 -bottom-4 text-[4rem] opacity-10">⭐</div>
+                    <div className="text-amber-800 font-bold text-sm mb-1 z-10">目前信用</div>
+                    <div className="font-black text-2xl text-amber-500 z-10 flex items-center gap-1"><Star size={20} fill="currentColor" />{myPlayer.trust}</div>
+                 </div>
+              </div>
+              <div className="mb-5">
+                  <div className="text-slate-400 mb-2 text-center text-sm font-bold">🌟 拿 1 點信用換零用錢</div>
+                  <button onClick={handleMortgageTrust} disabled={myPlayer.trust <= 1} className={`w-full py-4 rounded-[1.5rem] text-xl shadow-[0_5px_0_0_rgba(0,0,0,0.1)] active:translate-y-[5px] active:shadow-none active:border-b-0 transition-all flex items-center justify-center gap-2 border-[4px] border-white ${myPlayer.trust > 1 ? 'bg-amber-400 text-amber-900 hover:bg-amber-300 cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                     <Star size={24} fill="currentColor" /> {myPlayer.trust >= 10 ? '換取 $1000' : '換取 $500'}
+                  </button>
+              </div>
+              <div>
+                  <div className="text-slate-400 mb-3 text-center text-sm font-bold">🏠 變賣手上的地產？</div>
+                  {myProperties.length === 0 ? (
+                      <div className="text-center text-slate-300 text-lg py-8 bg-slate-50 rounded-[2rem] border-4 border-dashed border-slate-200">包包裡空空的 🥺</div>
+                  ) : (
+                      <div className="flex flex-col gap-3 max-h-56 overflow-y-auto pr-2 custom-scrollbar">
+                          {myProperties.map(sqId => {
+                              const sq = BOARD_SQUARES[sqId];
+                              if (!sq) return null;
+                              const sellPrice = myPlayer.trust >= 10 ? sq.price : Math.floor(sq.price * 0.5);
+                              return (
+                                  <div key={sqId} className="flex justify-between items-center p-4 bg-sky-50 rounded-[1.5rem] border-4 border-white shadow-sm font-black">
+                                      <span className="font-black text-sky-800 text-xl">{sq.name}</span>
+                                      <button onClick={() => setSellProcess({ sqId, price: sellPrice })} className="bg-rose-400 hover:bg-rose-300 text-white shadow-[0_4px_0_0_#e11d48] active:translate-y-[4px] active:shadow-none text-xl px-5 py-2 rounded-xl transition-all border-2 border-white font-black">變賣</button>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  )}
+              </div>
+             </>
+          ) : (
+             <div className="animate-in slide-in-from-right-4 pt-4 font-black">
+                <button onClick={() => setSellProcess(null)} className="text-sky-500 mb-4 underline font-black">← 返回</button>
+                <h3 className="text-xl font-black text-slate-700 mb-4 text-center">變賣：{BOARD_SQUARES[sellProcess.sqId].name}</h3>
+                <div className="bg-amber-50 p-4 rounded-xl mb-6 text-center border-2 border-amber-200">
+                    <div className="text-sm text-slate-500 mb-1">成交價</div>
+                    <div className="text-3xl text-amber-600 font-black">${sellProcess.price}</div>
+                </div>
+                <div className="text-xs text-slate-400 mb-3 font-black uppercase tracking-widest">請選擇出售對象：</div>
+                <div className="flex flex-col gap-3">
+                   <button onClick={() => handleSellToBank(sellProcess.sqId, sellProcess.price)} className="w-full py-4 bg-indigo-500 text-white rounded-2xl border-4 border-white shadow-md active:scale-95 transition-all font-black">🏦 賣給銀行 (立即領錢)</button>
+                   <div className="w-full h-0.5 bg-slate-100 my-1" />
+                   {gameData.players.filter(p => p.id !== activePlayerIndex && !p.isBankrupt && (isOfflineMode || p.uid !== null)).map(p => (
+                      <button key={p.id} onClick={() => initiatePlayerTrade(sellProcess.sqId, sellProcess.price, p.id)} className="w-full py-4 bg-white border-4 border-emerald-100 text-emerald-600 rounded-2xl shadow-sm flex items-center justify-between px-6 active:scale-95 transition-all font-black">
+                          <span>🤝 賣給 {p.name}</span><span className="text-4xl">{p.icon}</span>
+                      </button>
+                   ))}
+                </div>
+             </div>
+          )}
+      </div>
+    </div>
+  );
+};
+
+const ActionModal = ({ isTradeActive, tradeBuyer, gameData, myPlayer, tradeBuyerMoney, handleRespondTrade, handleThrowBwaBwei, handleFinishBwaBwei, canBuy, handleBuyProperty, currentSquare, handleEndTurn, activePlayerIndex }) => {
+  const showBasicAction = gameData.currentPlayerIdx === activePlayerIndex && myPlayer && !myPlayer.isBankrupt && ['JAIL_BWA_BWEI', 'ACTION', 'END_TURN'].includes(gameData.gameState) && !gameData.pendingTrade;
+  if (!isTradeActive && !showBasicAction) return null;
+
+  let content = null;
+  if (isTradeActive) {
+      if (tradeBuyer?.isAI) {
+          content = (
+             <div className="flex flex-col items-center gap-4 py-8">
+                 <div className="text-6xl animate-bounce mb-4">🤖</div>
+                 <h2 className="text-3xl font-black text-slate-700">{tradeBuyer.name} 思考收購中...</h2>
+                 <p className="text-slate-500 text-lg">請稍候</p>
+             </div>
+          );
+      } else {
+          content = (
+             <>
+                <div className="bg-emerald-50 p-6 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-2 border-4 border-white shadow-inner text-emerald-500"><Handshake size={48} /></div>
+                <h2 className="text-3xl font-black text-slate-700">🤝 產權購買邀請</h2>
+                <p className="text-xl text-slate-500 leading-relaxed font-black">玩家 <span className="text-amber-600">{gameData.players[gameData.pendingTrade.sellerIdx].name}</span> <br/>想以 <span className="text-emerald-500 font-black">${gameData.pendingTrade.price}</span> 出售 <br/><span className="text-sky-600 font-black">{BOARD_SQUARES[gameData.pendingTrade.sqId].name}</span> 給 <span className="text-emerald-600">{tradeBuyer?.name || ''}</span>！</p>
+                <div className="flex gap-4 w-full">
+                   <button onClick={() => handleRespondTrade(false)} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl border-4 border-white shadow-md font-black text-xl active:scale-95 transition-all">婉拒</button>
+                   <button disabled={tradeBuyerMoney < gameData.pendingTrade.price} onClick={() => handleRespondTrade(true)} className={`flex-1 py-4 rounded-2xl border-4 border-white shadow-lg font-black text-xl active:translate-y-1 transition-all ${tradeBuyerMoney >= gameData.pendingTrade.price ? 'bg-emerald-400 text-white shadow-[0_6px_0_0_#10b981]' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                     {tradeBuyerMoney < gameData.pendingTrade.price ? '資金不足' : '收購！'}
+                   </button>
+                </div>
+             </>
+          );
+      }
+  } else {
+      if (myPlayer?.isAI) {
+          content = (
+             <div className="flex flex-col items-center gap-4 py-8">
+                 <div className="text-6xl animate-bounce mb-4">🤖</div>
+                 <h2 className="text-3xl font-black text-slate-700">{myPlayer.name} 行動中...</h2>
+                 <p className="text-slate-500 text-lg whitespace-pre-line">{gameData.actionMessage || "請稍候"}</p>
+             </div>
+          );
+      } else {
+          const bwaLen = (gameData.bwaBweiResults || []).length;
+          const hasOwner = gameData.properties?.[currentSquare?.id] !== undefined;
+          content = (
+             <>
+               {gameData.gameState === 'JAIL_BWA_BWEI' && (
+                 <div className="flex flex-col items-center w-full px-1 md:px-2">
+                   <div className="text-2xl font-black text-rose-500 mb-6 bg-rose-50 px-8 py-3 rounded-full border-4 border-white shadow-sm font-black">🚨 靜心房擲杯判定</div>
+                   <div className="flex gap-4 mb-8">
+                     {[0, 1, 2].map(i => {
+                       const res = (gameData.bwaBweiResults || [])[i];
+                       return (
+                           <div key={i} className={`w-24 h-28 rounded-2xl flex flex-col items-center justify-center border-4 shadow-sm ${res === 'HOLY' ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
+                             <div className="flex scale-75 mb-2">
+                                {res === 'HOLY' && <><BweiBlock isFlat={true} className="rotate-12" /><BweiBlock isFlat={false} className="-rotate-12 scale-x-[-1] ml-[-8px]" /></>}
+                                {res === 'LAUGH' && <><BweiBlock isFlat={true} className="rotate-12" /><BweiBlock isFlat={true} className="-rotate-12 scale-x-[-1] ml-[-8px]" /></>}
+                                {res === 'YIN' && <><BweiBlock isFlat={false} className="rotate-12" /><BweiBlock isFlat={false} className="-rotate-12 scale-x-[-1] ml-[-8px]" /></>}
+                             </div>
+                             <span className="font-black text-sm">{res === 'HOLY' ? '聖杯' : res ? '無杯' : ''}</span>
+                           </div>
+                       );
+                     })}
+                   </div>
+                   {bwaLen < 3 ? <button onClick={handleThrowBwaBwei} className="w-full py-5 bg-rose-400 text-white rounded-[2rem] border-4 border-white shadow-lg text-2xl font-black">🙏 擲杯</button> : <button onClick={handleFinishBwaBwei} className="w-full py-5 bg-emerald-400 text-white rounded-[2rem] border-4 border-white shadow-lg text-2xl animate-bounce font-black">✨ 查看結果</button>}
+                 </div>
+               )}
+               {gameData.gameState !== 'JAIL_BWA_BWEI' && <div className="text-3xl leading-relaxed whitespace-pre-line px-4 text-slate-700 font-black">{gameData.actionMessage}</div>}
+               <div className="flex flex-col gap-4 w-full mt-4 font-black">
+                 {gameData.gameState === 'ACTION' && currentSquare?.type === 'PROPERTY' && (!hasOwner) && (
+                   <button onClick={canBuy ? handleBuyProperty : undefined} disabled={!canBuy} className={`py-5 rounded-[2rem] border-4 border-white shadow-lg font-black text-2xl transition-all active:scale-95 ${canBuy ? 'bg-sky-400 text-white shadow-md' : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'}`}>🎁 買下這裡！(${currentSquare.price || 0})</button>
+                 )}
+                 {(gameData.gameState === 'ACTION' || gameData.gameState === 'END_TURN') && <button onClick={handleEndTurn} className="py-5 bg-amber-400 text-amber-900 rounded-[2rem] border-4 border-white shadow-lg text-2xl font-black active:translate-y-1 transition-all">✅ 結束回合</button>}
+               </div>
+             </>
+          );
+      }
+  }
+
+  return (
+    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[250] bg-white/98 backdrop-blur-md p-8 rounded-[3rem] border-[8px] border-sky-100 shadow-2xl w-[95vw] max-w-[560px] text-center pointer-events-auto flex flex-col items-center gap-6 animate-in zoom-in-95">
+        {content}
+    </div>
+  );
+};
+
+const PlayerPiece = ({ p, pArrayIdx, activePlayersHere, gameData, activePlayerIndexInHere, isMyTurnOnThisCell, activePlayerIndex, myPlayer, inverseZoom, handleRollDice, setShowAssetManager, isTradeActive }) => {
+  const isActive = gameData.currentPlayerIdx === p.id;
+  let tX = 0; let tY = 0;
+  if (!isActive) {
+      let myInactiveIdx = pArrayIdx;
+      if (activePlayerIndexInHere !== -1 && pArrayIdx > activePlayerIndexInHere) myInactiveIdx = pArrayIdx - 1;
+      const pos = INACTIVE_OFFSETS[myInactiveIdx % INACTIVE_OFFSETS.length];
+      tX = pos.x; tY = pos.y;
+  }
+
+  return (
+      <div className={`absolute transition-all duration-500 ease-out pointer-events-auto flex flex-col items-center ${isActive ? 'z-50' : 'z-10'}`} style={{ transform: `translate(${tX}px, ${tY}px)` }}>
+          {gameData.gameState === 'MOVING' && gameData.currentPlayerIdx === p.id && gameData.remainingSteps > 0 && (
+              <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-[150] w-24 flex justify-center">
+                <div className="bg-sky-400 border-[6px] border-white text-white font-black rounded-full w-24 h-24 flex items-center justify-center text-[3rem] shadow-[0_10px_20px_rgba(0,0,0,0.15)] animate-bounce">
+                  {gameData.remainingSteps}
+                </div>
+              </div>
+          )}
+
+          {p.inJail && <div className="absolute -top-6 -right-6 text-4xl animate-pulse drop-shadow-md z-40 bg-white p-1 rounded-full border-2 border-slate-100">🙏</div>}
+          
+          <div onClick={(e) => { if (p.id === activePlayerIndex && (!myPlayer || !myPlayer.isAI)) { e.stopPropagation(); setShowAssetManager(true); } }} className={`w-20 h-20 bg-white rounded-full border-[6px] flex items-center justify-center text-[3rem] shadow-[0_8px_15px_rgba(0,0,0,0.1)] transition-all duration-500 ${isActive ? 'border-amber-400 scale-125 z-40 relative' : 'border-slate-200 scale-[0.65] grayscale opacity-70 z-10'} ${p.id === activePlayerIndex && !p.isAI ? 'cursor-pointer hover:ring-[6px] hover:ring-sky-300 hover:scale-[1.4] hover:grayscale-0 hover:opacity-100' : ''}`}>
+              {p.icon}
+              {p.id === activePlayerIndex && !p.isBankrupt && (!myPlayer || !myPlayer.isAI) && (
+                <div className="absolute -bottom-2 -right-2 bg-amber-400 text-amber-900 p-1.5 rounded-full shadow-md border-4 border-white z-50 animate-bounce">
+                   <Briefcase size={18} strokeWidth={3} />
+                </div>
+              )}
+          </div>
+
+          {isMyTurnOnThisCell && p.id === activePlayerIndex && !(myPlayer?.isBankrupt) && gameData.gameState === 'IDLE' && !(myPlayer?.inJail) && !isTradeActive && (
+              <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 z-[200]">
+                <div className="flex flex-col items-center gap-3 animate-in slide-in-from-bottom-4 duration-300" style={{ transform: `scale(${inverseZoom})`, transformOrigin: 'bottom center' }}>
+                  {myPlayer?.isAI ? (
+                      <div className="whitespace-nowrap px-6 py-3 bg-slate-700 text-white rounded-[2rem] font-black text-xl shadow-lg flex items-center gap-2 animate-pulse border-[3px] border-slate-500">🤖 思考中...</div>
+                  ) : (
+                      <button onClick={handleRollDice} className="whitespace-nowrap px-8 py-4 bg-sky-400 hover:bg-sky-300 text-white rounded-[2rem] font-black text-3xl shadow-[0_8px_0_0_#0284c7,0_10px_20px_rgba(0,0,0,0.15)] active:shadow-none active:translate-y-[8px] active:border-b-0 transition-all flex items-center gap-3 border-[4px] border-white animate-bounce"><Dice5 size={32} strokeWidth={3} /> 擲骰子</button>
+                  )}
+                </div>
+              </div>
+          )}
+      </div>
+  );
+};
+
+const MapSquareNode = ({ sq, idx, gameData, activePlayerIndex, myPlayer, inverseZoom, handleRollDice, setShowAssetManager, setSelectedSquareInfo, isTradeActive, dragStatus }) => {
+  const { row, col } = GRID_ORDER[idx];
+  const ownerId = gameData.properties?.[idx];
+  const owner = ownerId !== undefined ? gameData.players.find(p => p.id === ownerId) : null;
+  const activePlayersHere = gameData.players.filter(p => p.pos === idx && p.uid !== null && !p.isBankrupt);
+  
+  const bodyBg = owner ? getOwnerBodyClass(owner.color) : 'bg-white';
+  const borderClass = owner ? getOwnerBorderClass(owner.color) : 'border-white';
+  const contentClass = `flex-1 flex flex-col items-center justify-center p-2 relative w-full h-full ${bodyBg} z-10`;
+
+  const activePlayerIndexInHere = activePlayersHere.findIndex(ap => gameData.currentPlayerIdx === ap.id);
+  const isMyTurnOnThisCell = activePlayerIndexInHere !== -1 && gameData.currentPlayerIdx === activePlayerIndex;
+
+  return (
+      <div style={{ display: 'contents' }}>
+          <div onClick={() => { if (!dragStatus.current.moved) setSelectedSquareInfo(idx); }} className={`rounded-[1.5rem] relative flex flex-col overflow-hidden shadow-sm z-10 border-4 border-b-[8px] cursor-pointer hover:scale-[1.03] transition-transform pointer-events-auto ${borderClass}`} style={{ gridRow: row, gridColumn: col }}>
+              {sq.type === 'PROPERTY' && <div className={`h-[20%] min-h-[20%] w-full ${owner ? owner.color : sq.color} border-b-4 border-white/50 z-0 shrink-0`} />}
+              <div className={contentClass}>
+                  <span className="font-black text-slate-700 text-2xl leading-tight text-center mt-1 drop-shadow-sm">{sq.name}</span>
+                  {sq.type === 'START' && <span className="text-emerald-700 font-black text-lg leading-tight mt-1 bg-emerald-100 px-3 py-0.5 rounded-full border-2 border-emerald-300">領 $500</span>}
+                  {sq.type === 'TAX' && <span className="text-rose-700 font-black text-lg leading-tight mt-1 bg-rose-100 px-3 py-0.5 rounded-full border-2 border-rose-300">繳 ${sq.amount}</span>}
+                  {sq.price && <span className="text-sky-600 font-black text-xl leading-tight mt-1">${sq.price}</span>}
+                  {sq.reqTrust > 0 && <div className="mt-1 bg-amber-50 text-amber-600 text-xs font-black px-2 py-0.5 rounded-full border-2 border-amber-300 flex items-center justify-center gap-1 shadow-sm"><Star size={14} fill="currentColor" /> {sq.reqTrust} 點</div>}
+              </div>
+          </div>
+          
+          <div className={`flex items-center justify-center relative ${activePlayerIndexInHere !== -1 ? 'z-[100]' : 'z-20 pointer-events-none'}`} style={{ gridRow: row, gridColumn: col }}>
+              {activePlayersHere.map((p, pArrayIdx) => (
+                  <PlayerPiece key={p.id} p={p} pArrayIdx={pArrayIdx} activePlayersHere={activePlayersHere} gameData={gameData} activePlayerIndexInHere={activePlayerIndexInHere} isMyTurnOnThisCell={isMyTurnOnThisCell} activePlayerIndex={activePlayerIndex} myPlayer={myPlayer} inverseZoom={inverseZoom} handleRollDice={handleRollDice} setShowAssetManager={setShowAssetManager} isTradeActive={isTradeActive} />
+              ))}
+          </div>
+      </div>
+  );
+};
+
 // =========================================================
-// 4. 主程式 App 元件
+// 5. 導出主程式
 // =========================================================
 export default function App() {
   const [appPhase, setAppPhase] = useState('LANDING'); 
@@ -247,7 +690,7 @@ export default function App() {
   const [setupName, setSetupName] = useState('玩家 1');
   const [localNames, setLocalNames] = useState(['玩家 1', '電腦 1', '電腦 2', '電腦 3', '電腦 4', '電腦 5']);
   const [localPlayerTypes, setLocalPlayerTypes] = useState(['HUMAN', 'AI', 'AI', 'AI', 'AI', 'AI']);
-  const [localAvatars, setLocalAvatars] = useState([...CHILD_AVATARS].slice(0, 6));
+  const [localAvatars, setLocalAvatars] = useState([...CHILD_AVATARS]);
   const [editingLocalPlayer, setEditingLocalPlayer] = useState(0);
 
   const [user, setUser] = useState(null);
@@ -287,30 +730,27 @@ export default function App() {
   const mapRef = useRef(null);
 
   const activePlayerIndex = isOfflineMode ? gameData.currentPlayerIdx : (myPlayerIndex !== null ? myPlayerIndex : 0);
-  const myPlayer = gameData.players?.find(p => p.id === activePlayerIndex) || null;
+  const myPlayer = gameData.players.find(p => p.id === activePlayerIndex) || null;
   const currentSquare = myPlayer?.pos !== undefined ? BOARD_SQUARES[myPlayer.pos] : null;
   
-  const myMoney = Number(myPlayer?.money || 0);
-  const myTrust = Number(myPlayer?.trust || 0);
-  const reqMoney = Number(currentSquare?.price || 0);
-  const reqTrust = Number(currentSquare?.reqTrust || 0);
+  const myMoney = myPlayer?.money ? Number(myPlayer.money) : 0;
+  const myTrust = myPlayer?.trust ? Number(myPlayer.trust) : 0;
+  const reqMoney = currentSquare?.price ? Number(currentSquare.price) : 0;
+  const reqTrust = currentSquare?.reqTrust ? Number(currentSquare.reqTrust) : 0;
   
   const wRatio = viewportSize.w / MAP_SIZE;
   const hRatio = viewportSize.h / MAP_SIZE;
-  const minRatio = wRatio < hRatio ? wRatio : hRatio;
-  const displayZoom = isFullMapMode ? (minRatio * 0.9) : zoom;
+  const displayZoom = isFullMapMode ? (Math.min(wRatio, hRatio) * 0.9) : zoom;
   const inverseZoom = 1 / displayZoom; 
   
   const canBuy = Boolean(currentSquare && myMoney >= reqMoney && myTrust >= reqTrust);
-  
-  const propertiesObj = gameData.properties || {};
-  const myProperties = Object.keys(propertiesObj).filter(key => propertiesObj[key] === activePlayerIndex).map(Number);
-
+  const myProperties = Object.keys(gameData.properties || {}).filter(k => gameData.properties[k] === activePlayerIndex).map(Number);
   const safeDice = displayDice || [1, 1];
+
   const pendingBuyerId = gameData.pendingTrade?.buyerIdx ?? -1;
   const isTradeActive = Boolean(gameData.pendingTrade && (isOfflineMode || pendingBuyerId === activePlayerIndex));
-  const tradeBuyer = gameData.players?.find(p => p.id === pendingBuyerId) || null;
-  const tradeBuyerMoney = tradeBuyer ? Number(tradeBuyer.money || 0) : 0;
+  const tradeBuyer = gameData.players.find(p => p.id === pendingBuyerId) || null;
+  const tradeBuyerMoney = tradeBuyer?.money ? Number(tradeBuyer.money) : 0;
 
   const syncGameData = useCallback(async (updates) => {
     if (isOfflineMode) {
@@ -325,88 +765,21 @@ export default function App() {
 
   useEffect(() => {
     bgmRef.current = new Audio("https://dn721809.ca.archive.org/0/items/md_music_toy_story/13%20-%20Level%209%20-%20Food%20and%20Drink%20-%20Andy%20Blythe%2C%20Marten%20Joustra.mp3");
-    bgmRef.current.loop = true;  
-    bgmRef.current.volume = 0.1; 
-    return () => {
-      if (bgmRef.current) { bgmRef.current.pause(); bgmRef.current.src = ""; }
-    };
+    bgmRef.current.loop = true; bgmRef.current.volume = 0.1; 
+    return () => { if (bgmRef.current) { bgmRef.current.pause(); bgmRef.current.src = ""; } };
   }, []);
 
   useEffect(() => {
     if (!bgmRef.current) return;
     if (isMuted) bgmRef.current.pause();
-    else if (bgmStarted) {
-      const p = bgmRef.current.play();
-      if (p !== undefined) p.catch(() => console.log("Waiting for user interaction"));
-    }
+    else if (bgmStarted) { const p = bgmRef.current.play(); if (p !== undefined) p.catch(() => {}); }
   }, [isMuted, bgmStarted]);
 
   useEffect(() => {
-    const handleInteraction = () => {
-      if (!bgmStarted) setBgmStarted(true);
-      document.removeEventListener('click', handleInteraction);
-      document.removeEventListener('touchstart', handleInteraction);
-    };
-    document.addEventListener('click', handleInteraction);
-    document.addEventListener('touchstart', handleInteraction);
-    return () => {
-      document.removeEventListener('click', handleInteraction);
-      document.removeEventListener('touchstart', handleInteraction);
-    };
-  }, [bgmStarted]);
-
-  useEffect(() => {
-    const el = mapRef.current;
-    if (!el) return;
-    const onStart = (e) => {
-      dragStatus.current.isDragging = true; dragStatus.current.moved = false; 
-      dragStatus.current.initX = e.clientX; dragStatus.current.initY = e.clientY;
-      dragStatus.current.startX = e.clientX - manualOffset.x; dragStatus.current.startY = e.clientY - manualOffset.y;
-    };
-    const onMove = (e) => {
-      if (!dragStatus.current.isDragging) return;
-      if (Math.abs(e.clientX - dragStatus.current.initX) > 5 || Math.abs(e.clientY - dragStatus.current.initY) > 5) dragStatus.current.moved = true;
-      setManualOffset({ x: e.clientX - dragStatus.current.startX, y: e.clientY - dragStatus.current.startY });
-    };
-    const onEnd = () => { dragStatus.current.isDragging = false; };
-    el.addEventListener('pointerdown', onStart); window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onEnd);
-    return () => { el.removeEventListener('pointerdown', onStart); window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onEnd); };
-  }, [manualOffset]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setViewportSize({ w: window.innerWidth, h: window.innerHeight });
-      const handleResize = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-    }
+    const startAudio = () => setBgmStarted(true);
+    document.addEventListener('click', startAudio, { once: true });
+    document.addEventListener('touchstart', startAudio, { once: true });
   }, []);
-
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-        else await signInAnonymously(auth);
-        setErrorMsg(null);
-      } catch (e) {
-        if (firebaseConfig.apiKey && (firebaseConfig.apiKey.includes("請貼上") || firebaseConfig.apiKey.includes("填入"))) setErrorMsg("請確認 Firebase API_KEY！(單機模式可忽略)");
-        else setErrorMsg("網路連線失敗，請檢查金鑰。");
-      }
-    };
-    initAuth();
-    return onAuthStateChanged(auth, setUser);
-  }, []);
-
-  useEffect(() => {
-    if (isOfflineMode || !user || !roomId || appPhase !== 'GAME') return;
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
-    return onSnapshot(roomRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data(); setGameData(data);
-        if (data.timeLeft !== -1 && localTimeLeft === 0) setLocalTimeLeft(data.timeLeft);
-      }
-    });
-  }, [user, roomId, appPhase, isOfflineMode, localTimeLeft]);
 
   useEffect(() => {
     if (appPhase !== 'GAME' || gameData.timeLeft === -1 || gameData.gameState === 'GAME_OVER') return;
@@ -438,11 +811,32 @@ export default function App() {
     focusOnCurrentPlayer();
   }, [gameData.currentPlayerIdx, gameData.players, isFullMapMode, displayZoom, viewportSize, appPhase, focusOnCurrentPlayer]);
 
+  useEffect(() => {
+    const el = mapRef.current;
+    if (!el) return;
+    const onStart = (e) => { dragStatus.current.isDragging = true; dragStatus.current.moved = false; dragStatus.current.initX = e.clientX; dragStatus.current.initY = e.clientY; dragStatus.current.startX = e.clientX - manualOffset.x; dragStatus.current.startY = e.clientY - manualOffset.y; };
+    const onMove = (e) => { if (!dragStatus.current.isDragging) return; if (Math.abs(e.clientX - dragStatus.current.initX) > 5 || Math.abs(e.clientY - dragStatus.current.initY) > 5) dragStatus.current.moved = true; setManualOffset({ x: e.clientX - dragStatus.current.startX, y: e.clientY - dragStatus.current.startY }); };
+    const onEnd = () => { dragStatus.current.isDragging = false; };
+    el.addEventListener('pointerdown', onStart); window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onEnd);
+    return () => { el.removeEventListener('pointerdown', onStart); window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onEnd); };
+  }, [manualOffset]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setViewportSize({ w: window.innerWidth, h: window.innerHeight });
+      const onResize = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
+      window.addEventListener('resize', onResize);
+      return () => window.removeEventListener('resize', onResize);
+    }
+  }, []);
+
   const handleStartLocalGame = async () => {
     playSound('win', isMuted); setIsOfflineMode(true);
     const initialPlayers = Array.from({ length: setupPlayerCount }).map((_, i) => ({
-      id: i, name: (localNames[i] || '').trim() || `玩家 ${i + 1}`, icon: localAvatars[i], color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
-      pos: 0, money: BASE_MONEY, trust: BASE_TRUST, inJail: false, jailRoundsLeft: 0, isBankrupt: false, uid: `local_player_${i}`, isAI: localPlayerTypes[i] === 'AI'
+      id: i, name: (localNames[i] || '').trim() || `玩家 ${i + 1}`, icon: localAvatars[i], 
+      color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
+      pos: 0, money: BASE_MONEY, trust: BASE_TRUST, inJail: false, jailRoundsLeft: 0, isBankrupt: false,
+      uid: `local_player_${i}`, isAI: localPlayerTypes[i] === 'AI'
     }));
     setGameData({ players: initialPlayers, currentPlayerIdx: 0, gameState: 'IDLE', roomId: 'LOCAL', timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0, diceVals: [1, 1], bwaBweiResults: [], pendingTrade: null });
     setRoomId('單機同樂'); setAppPhase('GAME'); setLocalTimeLeft(setupTimeLimit);
@@ -453,13 +847,14 @@ export default function App() {
     playSound('win', isMuted); setIsOfflineMode(false);
     const id = Math.random().toString(36).substring(2, 8).toUpperCase();
     const initialPlayers = Array.from({ length: setupPlayerCount }).map((_, i) => ({
-      id: i, name: i === 0 ? ((setupName || '').trim() || '房主') : `玩家 ${i + 1}`, icon: i === 0 ? setupAvatar : '⏳', color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
+      id: i, name: i === 0 ? ((setupName || '').trim() || '房主') : `玩家 ${i + 1}`, icon: i === 0 ? setupAvatar : '⏳', 
+      color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
       pos: 0, money: BASE_MONEY, trust: BASE_TRUST, inJail: false, jailRoundsLeft: 0, isBankrupt: false, uid: i === 0 ? user.uid : null 
     }));
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), { players: initialPlayers, currentPlayerIdx: 0, gameState: 'IDLE', roomId: id, timeLeft: setupTimeLimit, properties: {}, actionMessage: '', remainingSteps: 0, diceVals: [1, 1], bwaBweiResults: [], pendingTrade: null });
       setRoomId(id); setIsHost(true); setMyPlayerIndex(0); setAppPhase('GAME'); setLocalTimeLeft(setupTimeLimit);
-    } catch (e) { setErrorMsg("建立失敗，請確認 Firebase 設定。"); }
+    } catch (e) { setErrorMsg("建立失敗，請確認設定。"); }
   };
 
   const handleJoinRoom = async () => {
@@ -516,53 +911,55 @@ export default function App() {
           nextPlayers[activePlayerIndex] = { ...player, pos: newPos, money: newMoney };
           await syncGameData({ players: nextPlayers, remainingSteps: gameData.remainingSteps - 1, actionMessage: msg });
         } else {
-          await handleLandOnSquare();
+          const sq = BOARD_SQUARES[player.pos];
+          let nextState = 'ACTION'; let msg = gameData.actionMessage || '';
+          const nextPlayers = [...gameData.players];
+          const currPlayerClone = { ...nextPlayers[activePlayerIndex] };
+
+          if (sq.type === 'START') { playSound('coin', isMuted); msg += `經過起點領零用錢囉！✨`; nextState = 'END_TURN'; }
+          else if (sq.type === 'TAX') { playSound('bad', isMuted); currPlayerClone.money -= sq.amount; msg += `💸 繳納 ${sq.name} $${sq.amount}！`; nextState = 'END_TURN'; }
+          else if (sq.type === 'CHANCE_GOOD' || sq.type === 'CHANCE_BAD') {
+            const cardPool = sq.type === 'CHANCE_GOOD' ? GOOD_CARDS : BAD_CARDS;
+            const card = cardPool[Math.floor(Math.random() * cardPool.length)];
+            msg += `【 ${card.desc} 】\n\n`;
+            if (card.goToJail) { playSound('bad', isMuted); currPlayerClone.pos = 10; currPlayerClone.inJail = true; currPlayerClone.jailRoundsLeft = -1; msg += `好好的懺悔反省 🙏\n請誠心擲杯問神明。`; nextState = 'JAIL_BWA_BWEI'; }
+            else { if (card.effectM > 0 || card.effectT > 0) playSound('win', isMuted); else playSound('bad', isMuted); currPlayerClone.money += card.effectM; currPlayerClone.trust += card.effectT; msg += `資金 ${card.effectM > 0 ? '+'+card.effectM : card.effectM}\n信用 ${card.effectT > 0 ? '+'+card.effectT : card.effectT}`; }
+            if (!card.goToJail) nextState = 'END_TURN';
+          }
+          else if (sq.type === 'GO_TO_JAIL' || sq.id === 30 || sq.id === 10) { playSound('bad', isMuted); currPlayerClone.pos = 10; currPlayerClone.inJail = true; currPlayerClone.jailRoundsLeft = -1; msg += `好好的懺悔反省 🙏\n請誠心擲杯問神明。`; nextState = 'JAIL_BWA_BWEI'; }
+          else if (sq.type === 'PROPERTY') {
+            const ownerId = gameData.properties?.[sq.id];
+            if (ownerId !== undefined && ownerId !== activePlayerIndex) {
+              const owner = nextPlayers[ownerId];
+              if (!owner.inJail && !owner.isBankrupt) { playSound('bad', isMuted); const rent = Math.floor(sq.price * 0.4); currPlayerClone.money -= rent; nextPlayers[ownerId] = { ...nextPlayers[ownerId], money: nextPlayers[ownerId].money + rent }; msg += `踩到 ${owner.name} 的地盤，\n付過路費 $${rent} 給他吧！`; }
+              else { playSound('win', isMuted); msg += `幸運！ ${owner.name} ${owner.inJail ? '正在反省' : '已出局'}，免付過路費！ 🎉`; }
+              nextState = 'END_TURN';
+            } else if (ownerId === undefined) { playSound('click', isMuted); msg += `來到空地：${sq.name} 🏕️`; }
+            else { playSound('click', isMuted); msg += `來到自己的 ${sq.name}，\n巡視一下產業！ 😎`; nextState = 'END_TURN'; }
+          }
+          else if (sq.type === 'FREE_PARKING') { playSound('click', isMuted); msg += `平靜的一回合，\n培養品德心性的好地方 🍵`; nextState = 'END_TURN'; }
+          else { playSound('click', isMuted); msg += `在 ${sq.name} 休息一天 💤`; nextState = 'END_TURN'; }
+
+          nextPlayers[activePlayerIndex] = currPlayerClone;
+          let hasBankruptcies = false;
+          const checkedPlayers = nextPlayers.map(p => {
+             if (!p.isBankrupt && (p.money < 0 || p.trust <= 0)) { hasBankruptcies = true; return { ...p, isBankrupt: true }; }
+             return p;
+          });
+
+          if (hasBankruptcies && checkedPlayers[activePlayerIndex].isBankrupt) { playSound('bad', isMuted); msg += `\n\n🚨 哎呀！資金或信用歸零，你出局了！`; nextState = 'END_TURN'; }
+
+          let nextProps = { ...gameData.properties };
+          if (hasBankruptcies) {
+              const bankruptIds = checkedPlayers.filter(p => p.isBankrupt).map(p => p.id);
+              Object.keys(nextProps).forEach(k => { if(bankruptIds.includes(nextProps[k])) delete nextProps[k]; });
+          }
+          await syncGameData({ players: checkedPlayers, properties: nextProps, gameState: nextState, actionMessage: msg, bwaBweiResults: [] });
         }
       } catch (e) {}
     }, 350);
     return () => clearTimeout(moveTimer);
   }, [gameData.gameState, gameData.remainingSteps, gameData.currentPlayerIdx, activePlayerIndex, isOfflineMode, appPhase, gameData.players, gameData.actionMessage, syncGameData]);
-
-  const handleLandOnSquare = async () => {
-    const player = gameData.players[activePlayerIndex];
-    const sq = BOARD_SQUARES[player.pos];
-    let nextState = 'ACTION'; let msg = gameData.actionMessage || '';
-    const nextPlayers = [...gameData.players];
-    const currPlayerClone = { ...nextPlayers[activePlayerIndex] };
-
-    if (sq.type === 'START') { playSound('coin', isMuted); msg += `經過起點領零用錢囉！✨`; nextState = 'END_TURN'; }
-    else if (sq.type === 'TAX') { playSound('bad', isMuted); currPlayerClone.money -= sq.amount; msg += `💸 繳納 ${sq.name} $${sq.amount}！`; nextState = 'END_TURN'; }
-    else if (sq.type === 'CHANCE_GOOD' || sq.type === 'CHANCE_BAD') {
-      const cardPool = sq.type === 'CHANCE_GOOD' ? GOOD_CARDS : BAD_CARDS;
-      const card = cardPool[Math.floor(Math.random() * cardPool.length)];
-      msg += `【 ${card.desc} 】\n\n`;
-      if (card.goToJail) { playSound('bad', isMuted); currPlayerClone.pos = 10; currPlayerClone.inJail = true; currPlayerClone.jailRoundsLeft = -1; msg += `好好的懺悔反省 🙏\n請誠心擲杯問神明。`; nextState = 'JAIL_BWA_BWEI'; }
-      else { if (card.effectM > 0 || card.effectT > 0) playSound('win', isMuted); else playSound('bad', isMuted); currPlayerClone.money += card.effectM; currPlayerClone.trust += card.effectT; msg += `資金 ${card.effectM > 0 ? '+'+card.effectM : card.effectM}\n信用 ${card.effectT > 0 ? '+'+card.effectT : card.effectT}`; }
-      if (!card.goToJail) nextState = 'END_TURN';
-    } else if (sq.type === 'GO_TO_JAIL' || sq.id === 30 || sq.id === 10) { playSound('bad', isMuted); currPlayerClone.pos = 10; currPlayerClone.inJail = true; currPlayerClone.jailRoundsLeft = -1; msg += `好好的懺悔反省 🙏\n請誠心擲杯問神明。`; nextState = 'JAIL_BWA_BWEI'; }
-    else if (sq.type === 'PROPERTY') {
-      const ownerId = gameData.properties?.[sq.id];
-      if (ownerId !== undefined && ownerId !== activePlayerIndex) {
-        const owner = nextPlayers[ownerId];
-        if (!owner.inJail && !owner.isBankrupt) { playSound('bad', isMuted); const rent = Math.floor(sq.price * 0.4); currPlayerClone.money -= rent; nextPlayers[ownerId] = { ...nextPlayers[ownerId], money: nextPlayers[ownerId].money + rent }; msg += `踩到 ${owner.name} 的地盤，\n付過路費 $${rent} 給他吧！`; }
-        else { playSound('win', isMuted); msg += `幸運！ ${owner.name} ${owner.inJail ? '正在反省' : '已出局'}，免付過路費！ 🎉`; }
-        nextState = 'END_TURN';
-      } else if (ownerId === undefined) { playSound('click', isMuted); msg += `來到空地：${sq.name} 🏕️`; }
-      else { playSound('click', isMuted); msg += `來到自己的 ${sq.name}，\n巡視一下產業！ 😎`; nextState = 'END_TURN'; }
-    } else if (sq.type === 'FREE_PARKING') { playSound('click', isMuted); msg += `平靜的一回合，\n培養品德心性的好地方 🍵`; nextState = 'END_TURN'; }
-    else { playSound('click', isMuted); msg += `在 ${sq.name} 休息一天 💤`; nextState = 'END_TURN'; }
-
-    nextPlayers[activePlayerIndex] = currPlayerClone;
-    const bkResult = checkBankruptcy(nextPlayers);
-    if (bkResult.changed && bkResult.newPlayers[activePlayerIndex].isBankrupt) { playSound('bad', isMuted); msg += `\n\n🚨 哎呀！資金或信用歸零，你出局了！`; nextState = 'END_TURN'; }
-
-    let nextProps = { ...gameData.properties };
-    if (bkResult.changed) {
-        const bankruptIds = bkResult.newPlayers.filter(p => p.isBankrupt).map(p => p.id);
-        Object.keys(nextProps).forEach(k => { if(bankruptIds.includes(nextProps[k])) delete nextProps[k]; });
-    }
-    await syncGameData({ players: bkResult.newPlayers, properties: nextProps, gameState: nextState, actionMessage: msg, bwaBweiResults: [] });
-  };
 
   const handleThrowBwaBwei = async () => {
     if (gameData.currentPlayerIdx !== activePlayerIndex) return;
@@ -717,181 +1114,16 @@ export default function App() {
   }, [gameData.gameState, gameData.currentPlayerIdx, gameData.bwaBweiResults, gameData.pendingTrade, isOfflineMode, appPhase, gameData.players, gameData.properties, handleBuyProperty, handleEndTurn, handleFinishBwaBwei, handleRespondTrade, handleRollDice, handleThrowBwaBwei, syncGameData]);
 
   if (appPhase === 'LANDING') {
-    return (
-      <div className="min-h-screen w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-4 md:p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
-        <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }`}</style>
-        <div className="absolute top-10 left-10 w-32 h-32 bg-white/40 rounded-full blur-xl animate-pulse" />
-        <div className="absolute bottom-20 right-20 w-48 h-48 bg-pink-300/20 rounded-full blur-2xl animate-pulse delay-700" />
-        <h1 className="text-5xl md:text-[4.5rem] font-black mb-4 md:mb-6 text-sky-500 tracking-widest drop-shadow-[0_6px_0_rgba(2,132,199,0.2)] text-center leading-tight">大信翁<span className="block text-xl md:text-2xl text-rose-400 mt-1 tracking-normal">Candy Bubble Edition 🍬</span></h1>
-        {errorMsg && <div className="mb-4 bg-rose-100 text-rose-700 p-3 rounded-2xl border-4 border-rose-300 shadow-sm">{String(errorMsg)}</div>}
-        <div className={`bg-white/90 backdrop-blur-md border-[6px] border-sky-200 p-6 md:p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] w-full transition-all duration-300 relative z-10 ${setupMode === 'INIT' ? 'max-w-md flex flex-col items-center gap-5' : 'max-w-4xl flex flex-col'}`}>
-          {setupMode === 'INIT' && (
-            <div className="flex flex-col gap-4 w-full">
-              <button onClick={() => setSetupMode('LOCAL')} className="py-4 md:py-5 rounded-[2rem] text-2xl md:text-3xl bg-amber-400 text-amber-900 border-[6px] border-white shadow-[0_6px_0_0_#d97706,0_10px_15px_rgba(0,0,0,0.1)] hover:-translate-y-1 hover:bg-amber-300 active:border-b-[0px] active:translate-y-[6px] active:shadow-none transition-all relative overflow-hidden group">單機同樂 🎪 <span className="text-sm block font-bold text-amber-800/70 mt-1">大家一起圍著螢幕玩</span></button>
-              <div className="flex items-center gap-4 my-1 opacity-40"><div className="flex-1 h-1.5 bg-sky-200 rounded-full" /><span className="font-black text-sky-800 text-sm tracking-widest">線上模式</span><div className="flex-1 h-1.5 bg-sky-200 rounded-full" /></div>
-              <button disabled={!user} onClick={() => setSetupMode('CREATE')} className={`py-4 rounded-[2rem] text-xl md:text-2xl border-[5px] border-white shadow-[0_5px_0_0_#0ea5e9,0_8px_10px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[5px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_5px_0_0_#cbd5e1]' : 'bg-sky-400 text-sky-900 hover:bg-sky-300'}`}>{user ? "創建連線房間 🏠" : "雲端連線中..."}</button>
-              <button disabled={!user} onClick={() => setSetupMode('JOIN')} className={`py-4 rounded-[2rem] text-xl md:text-2xl border-[5px] border-white shadow-[0_5px_0_0_#10b981,0_8px_10px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[5px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_5px_0_0_#cbd5e1]' : 'bg-emerald-400 text-emerald-900 hover:bg-emerald-300'}`}>加入好友房間 🚀</button>
-            </div>
-          )}
-          {(setupMode === 'LOCAL' || setupMode === 'CREATE') && (
-            <div className="w-full flex flex-col items-center gap-4 animate-in zoom-in-95 duration-300">
-              <div className="flex flex-col md:flex-row w-full gap-6">
-                <div className="flex-1 flex flex-col justify-center gap-4">
-                  <div className="w-full">
-                    <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><UsersIcon size={20} /> 幾個人一起玩呢？</div>
-                    <div className="flex flex-wrap justify-center gap-2 md:gap-3">
-                      {[2, 3, 4, 5, 6].map(num => <button key={num} onClick={() => setSetupPlayerCount(num)} className={`w-12 h-12 md:w-14 md:h-14 rounded-full text-xl md:text-2xl transition-all border-4 border-white ${setupPlayerCount === num ? 'bg-amber-400 text-amber-900 scale-110 shadow-[0_4px_0_0_#d97706]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>{num}</button>)}
-                    </div>
-                  </div>
-                  <div className="w-full border-t-[3px] border-dashed border-sky-100" />
-                  <div className="w-full">
-                    <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><Clock size={20} /> 玩多久呢？</div>
-                    <div className="flex flex-wrap justify-center gap-2 md:gap-3">
-                      {[{ l: '5 分', v: 300 }, { l: '10 分', v: 600 }, { l: '20 分', v: 1200 }, { l: '不限時', v: -1 }].map(t => <button key={t.v} onClick={() => setSetupTimeLimit(t.v)} className={`px-4 py-2 md:px-5 md:py-3 rounded-[1.5rem] transition-all border-4 border-white text-sm md:text-base ${setupTimeLimit === t.v ? 'bg-pink-400 text-pink-900 shadow-[0_4px_0_0_#db2777]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>{t.l}</button>)}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex-[1.2] flex flex-col">
-                  {setupMode === 'LOCAL' ? (
-                    <div className="w-full bg-sky-50 rounded-[2rem] p-4 md:p-5 border-4 border-white shadow-sm h-full flex flex-col">
-                      <div className="text-center text-sky-800 mb-2 md:mb-3 text-base md:text-lg">幫角色取名字＆換頭像吧！👇</div>
-                      <div className="flex flex-wrap justify-center gap-2 md:gap-3 mb-3 md:mb-4">
-                        {Array.from({ length: setupPlayerCount }).map((_, i) => (
-                          <div key={i} className="flex flex-col items-center gap-1 md:gap-2">
-                            <button onClick={() => setEditingLocalPlayer(i)} className={`w-10 h-10 md:w-12 md:h-12 rounded-full text-2xl md:text-3xl flex items-center justify-center bg-white transition-all border-4 ${editingLocalPlayer === i ? 'border-amber-400 scale-125 shadow-lg z-10 relative' : 'border-sky-200 opacity-70 hover:opacity-100 hover:scale-110'}`}>{localAvatars[i]}</button>
-                            <span className="text-[10px] md:text-xs text-sky-600 bg-white px-2 py-0.5 rounded-full border-2 border-sky-100 max-w-[60px] truncate">{localNames[i]}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex justify-center mt-2 mb-3">
-                        <button onClick={() => { const nextTypes = [...localPlayerTypes]; nextTypes[editingLocalPlayer] = nextTypes[editingLocalPlayer] === 'HUMAN' ? 'AI' : 'HUMAN'; setLocalPlayerTypes(nextTypes); }} className={`px-4 py-1.5 rounded-full border-[3px] text-sm md:text-base font-black transition-all shadow-sm flex items-center gap-1 ${localPlayerTypes[editingLocalPlayer] === 'AI' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-emerald-100 border-emerald-300 text-emerald-700'}`}>
-                          {localPlayerTypes[editingLocalPlayer] === 'AI' ? '🤖 電腦控制' : '🧑 玩家控制'}
-                        </button>
-                      </div>
-                      <div className="mb-3 w-full max-w-[200px] mx-auto">
-                        <input type="text" value={localNames[editingLocalPlayer]} onChange={e => { const nextNames = [...localNames]; nextNames[editingLocalPlayer] = e.target.value.substring(0, 6); setLocalNames(nextNames); }} placeholder={`玩家 ${editingLocalPlayer + 1} 名字`} className="w-full bg-white px-3 py-2 rounded-xl text-center text-sm md:text-base font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors" />
-                      </div>
-                      <div className="flex flex-wrap justify-center gap-2 max-h-24 md:max-h-32 overflow-y-auto p-2 bg-white rounded-[1.5rem] border-2 border-sky-100 custom-scrollbar mt-auto">
-                        {CHILD_AVATARS.map(avatar => {
-                          const tIdx = editingLocalPlayer < setupPlayerCount ? editingLocalPlayer : 0;
-                          return <button key={avatar} onClick={() => { const nA = [...localAvatars]; nA[tIdx] = avatar; setLocalAvatars(nA); }} className={`w-10 h-10 md:w-12 md:h-12 rounded-full text-2xl md:text-3xl flex items-center justify-center transition-all ${localAvatars[tIdx] === avatar ? 'bg-amber-100 border-4 border-amber-400 scale-110' : 'bg-slate-50 border-2 border-transparent hover:bg-sky-100'}`}>{avatar}</button>;
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="w-full bg-sky-50 rounded-[2rem] p-5 md:p-6 border-4 border-white shadow-sm h-full flex flex-col justify-center">
-                      <div className="text-center text-sky-800 mb-2 md:mb-3 text-lg md:text-xl">你的專屬角色與名字！</div>
-                      <div className="mb-4 w-full max-w-[200px] mx-auto">
-                        <input type="text" value={setupName} onChange={e => setSetupName(e.target.value.substring(0, 6))} placeholder="輸入你的名字" className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors" />
-                      </div>
-                      <div className="flex flex-wrap justify-center gap-2 md:gap-3 max-h-36 md:max-h-48 overflow-y-auto p-2 custom-scrollbar">
-                        {CHILD_AVATARS.map(avatar => <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-12 h-12 md:w-16 md:h-16 rounded-full text-3xl md:text-4xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}>{avatar}</button>)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex w-full gap-3 md:gap-4 mt-2 max-w-lg mx-auto">
-                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
-                <button onClick={setupMode === 'LOCAL' ? handleStartLocalGame : handleCreateRoom} className="flex-[2] py-3 md:py-4 text-white bg-emerald-400 rounded-[2rem] shadow-[0_5px_0_0_#10b981] hover:-translate-y-1 active:translate-y-[5px] active:shadow-none active:border-b-0 transition-all text-xl md:text-2xl border-[4px] border-white">出發囉！✨</button>
-              </div>
-            </div>
-          )}
-          {setupMode === 'JOIN' && (
-            <div className="w-full flex flex-col items-center gap-5 animate-in zoom-in-95 duration-300">
-              <div className="flex flex-col md:flex-row w-full gap-6">
-                <div className="flex-1 flex flex-col justify-center gap-5">
-                  <div className="w-full">
-                    <div className="text-center text-sky-700 mb-3 text-lg md:text-xl">請輸入房間密碼 🔑</div>
-                    <input type="text" placeholder="A1B2C3" value={roomId} onChange={e => setRoomId(e.target.value.toUpperCase())} className="w-full bg-white p-4 md:p-5 rounded-[2rem] text-center text-3xl md:text-4xl font-black border-[4px] border-sky-200 focus:border-amber-400 outline-none uppercase tracking-widest text-[#4a3424] shadow-inner" />
-                  </div>
-                </div>
-                <div className="flex-[1.2] flex flex-col">
-                  <div className="w-full bg-sky-50 rounded-[2rem] p-5 border-4 border-white shadow-sm h-full flex flex-col justify-center">
-                    <div className="text-center text-sky-800 mb-2 md:mb-3 text-lg md:text-xl">你的專屬角色與名字！</div>
-                    <div className="mb-4 w-full max-w-[200px] mx-auto">
-                      <input type="text" value={setupName} onChange={e => setSetupName(e.target.value.substring(0, 6))} placeholder="輸入你的名字" className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors" />
-                    </div>
-                    <div className="flex flex-wrap justify-center gap-2 md:gap-3 max-h-36 overflow-y-auto p-2 custom-scrollbar">
-                      {CHILD_AVATARS.map(avatar => <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-12 h-12 md:w-16 md:h-16 rounded-full text-3xl md:text-4xl flex items-center justify-center bg-white transition-all ${setupAvatar === avatar ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}>{avatar}</button>)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex w-full gap-3 md:gap-4 mt-2 max-w-lg mx-auto">
-                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
-                <button disabled={roomId.length < 4} onClick={handleJoinRoom} className={`flex-[2] py-3 md:py-4 text-white rounded-[2rem] transition-all text-xl md:text-2xl border-[4px] border-white ${roomId.length < 4 ? 'bg-slate-300 border-slate-200' : 'bg-sky-400 shadow-[0_5px_0_0_#0ea5e9] hover:-translate-y-1 active:translate-y-[5px] active:shadow-none active:border-b-0'}`}>加入房間 🚀</button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    return <LandingScreen setupMode={setupMode} setSetupMode={setSetupMode} setupPlayerCount={setupPlayerCount} setSetupPlayerCount={setSetupPlayerCount} setupTimeLimit={setupTimeLimit} setSetupTimeLimit={setSetupTimeLimit} setupAvatar={setupAvatar} setSetupAvatar={setSetupAvatar} setupName={setupName} setSetupName={setSetupName} localNames={localNames} setLocalNames={setLocalNames} localPlayerTypes={localPlayerTypes} setLocalPlayerTypes={setLocalPlayerTypes} localAvatars={localAvatars} setLocalAvatars={setLocalAvatars} editingLocalPlayer={editingLocalPlayer} setEditingLocalPlayer={setEditingLocalPlayer} user={user} roomId={roomId} setRoomId={setRoomId} errorMsg={errorMsg} handleStartLocalGame={handleStartLocalGame} handleCreateRoom={handleCreateRoom} handleJoinRoom={handleJoinRoom} />;
   }
 
-  if (gameData.gameState === 'GAME_OVER') {
-     const ranked = [...gameData.players].sort((a, b) => b.trust !== a.trust ? b.trust - a.trust : b.money - a.money);
-     return (
-        <div className="min-h-screen w-screen bg-[#fff8e7] flex flex-col items-center justify-center p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
-            <PartyPopper size={120} className="text-pink-400 mb-6 animate-bounce drop-shadow-md" />
-            <h1 className="text-[5rem] font-black mb-10 text-amber-500 drop-shadow-[0_6px_0_rgba(217,119,6,0.2)]">遊戲結束囉！🎉</h1>
-            <div className="bg-white p-10 rounded-[3rem] w-full max-w-xl shadow-[0_20px_50px_rgba(0,0,0,0.05)] border-[8px] border-amber-200 relative">
-                <h2 className="text-3xl font-black mb-8 text-amber-600 border-b-4 border-dashed border-amber-100 pb-6 text-center">🏆 大信翁排行榜 🏆</h2>
-                {ranked.map((p, i) => (
-                    <div key={p.id} className={`flex items-center justify-between p-5 mb-4 rounded-[2rem] border-4 ${i === 0 ? 'bg-amber-50 border-amber-400 shadow-md scale-105 relative z-10' : 'bg-slate-50 border-slate-200'}`}>
-                        {i === 0 && <div className="absolute -top-4 -left-4 text-4xl animate-bounce">👑</div>}
-                        <div className="flex items-center gap-5">
-                            <span className={`font-black text-3xl ${i === 0 ? 'text-amber-500' : 'text-slate-400'}`}>#{i+1}</span>
-                            <div className="text-5xl bg-white p-2 rounded-full shadow-sm border-2 border-slate-100">{p.icon}</div>
-                            <span className="font-black text-2xl text-slate-700">{p.name} {p.isBankrupt && <span className="text-sm text-red-400 ml-1">(出局)</span>}</span>
-                        </div>
-                        <div className="text-right">
-                            <div className="text-amber-500 font-black text-2xl flex items-center justify-end gap-1"><Star size={24} fill="currentColor" /> {p.trust} 點</div>
-                            <div className="text-emerald-500 font-black text-lg">💰 ${p.money}</div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-            <button onClick={() => window.location.reload()} className="mt-10 px-10 py-5 bg-sky-400 text-sky-900 rounded-[2.5rem] font-black text-2xl shadow-[0_8px_0_0_#0ea5e9] border-[6px] border-white hover:-translate-y-1 active:translate-y-[8px] active:shadow-none transition-all">再玩一次！</button>
-        </div>
-     );
-  }
+  if (gameData.gameState === 'GAME_OVER') return <GameOverScreen gameData={gameData} />;
 
   return (
-    <div className="h-screen w-screen bg-[#e0f2fe] overflow-hidden relative touch-none select-none font-black text-[#4a3424] flex flex-col">
+    <div className="h-[100dvh] w-screen bg-[#e0f2fe] overflow-hidden relative touch-none select-none font-black text-[#4a3424] flex flex-col">
       <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }`}</style>
       
-      <div className="absolute top-6 left-6 right-24 z-[150] flex gap-4 overflow-x-auto pb-6 px-2 pointer-events-auto items-center custom-scrollbar">
-        <div className="bg-white text-rose-500 rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center shadow-md h-[75px] shrink-0 border-4 border-rose-200">
-          <Timer size={20} className={localTimeLeft < 60 && localTimeLeft > 0 ? "animate-pulse" : ""} /> 
-          <span className="text-xl font-black mt-1">{formatTime(localTimeLeft)}</span>
-        </div>
-        <div className={`bg-white rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center font-black shadow-md h-[75px] shrink-0 border-4 tracking-wider ${isOfflineMode ? 'border-emerald-300 text-emerald-700' : 'border-sky-300 text-sky-700'}`}>
-          <div className="text-xs opacity-70">{isOfflineMode ? '模式' : '房號'}</div>
-          <div className="text-xl mt-1">{isOfflineMode ? '單機同樂 🎪' : roomId}</div>
-        </div>
-        <div className="w-1.5 h-10 bg-sky-200/50 mx-2 rounded-full shrink-0" />
-        {gameData.players.map(p => {
-          const isCurrent = gameData.currentPlayerIdx === p.id;
-          return (
-            <div key={p.id} className={`flex items-center gap-3 px-5 py-2.5 rounded-[2.5rem] border-4 shadow-sm h-[75px] shrink-0 transition-all duration-300 ${isCurrent ? 'border-amber-400 bg-amber-50 scale-110 z-10 shadow-[0_5px_15px_rgba(217,119,6,0.2)]' : 'border-white bg-white/80 opacity-90'} ${p.isBankrupt ? 'grayscale opacity-50' : ''}`}>
-              <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center text-4xl shadow-sm bg-white border-4 border-slate-100 relative">
-                  {p.icon}
-                  {p.inJail && !p.isBankrupt && <div className="absolute -top-2 -right-2 text-base animate-bounce drop-shadow-md">🙏</div>}
-              </div>
-              <div className="flex flex-col justify-center min-w-[85px]">
-                  <div className="text-[14px] text-slate-500 flex justify-between items-center leading-none mb-1.5"><span className={isCurrent ? "text-amber-700" : "text-slate-600"}>{p.name}</span></div>
-                  {p.uid !== null && !p.isBankrupt ? (
-                      <div className="flex gap-2 items-end leading-none">
-                          <span className={`text-[1.1rem] ${p.money < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>${p.money}</span>
-                          <span className={`text-[13px] flex items-center gap-0.5 ${p.trust <= 0 ? 'text-rose-500' : 'text-amber-500'}`}><Star size={12} fill="currentColor" />{p.trust}</span>
-                      </div>
-                  ) : (<span className="text-sm text-slate-400 italic mt-1">{p.isBankrupt ? '出局 🥺' : '等待中...'}</span>)}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <TopBar localTimeLeft={localTimeLeft} isOfflineMode={isOfflineMode} roomId={roomId} gameData={gameData} />
 
       <div className="absolute right-4 bottom-8 md:right-6 md:bottom-10 flex flex-col items-end z-[150] pointer-events-auto">
         <div className={`flex flex-col items-end gap-3 transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-[500px] opacity-100 pb-3 pointer-events-auto' : 'max-h-0 opacity-0 pointer-events-none'}`}>
@@ -921,203 +1153,11 @@ export default function App() {
         </div>
       )}
 
-      {selectedSquareInfo !== null && (() => {
-        const sq = BOARD_SQUARES[selectedSquareInfo];
-        const ownerId = gameData.properties ? gameData.properties[sq.id] : undefined;
-        const owner = ownerId !== undefined ? gameData.players.find(p => p.id === ownerId) : null;
-        const rentPrice = Math.floor(sq.price * 0.4);
+      <SquareDetailsModal selectedSquareInfo={selectedSquareInfo} setSelectedSquareInfo={setSelectedSquareInfo} gameData={gameData} />
 
-        return (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setSelectedSquareInfo(null)}>
-            <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 w-full max-w-sm animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setSelectedSquareInfo(null)} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3} /></button>
-              
-              <div className={`w-full h-20 rounded-[1.5rem] mb-5 ${sq.color || 'bg-slate-200'} border-4 border-white shadow-sm flex items-center justify-center text-4xl`}>
-                {sq.type === 'START' && '✨'}{sq.type === 'TAX' && '💸'}{sq.type === 'JAIL' && '🙏'}
-                {sq.type === 'CHANCE_GOOD' && '🍀'}{sq.type === 'CHANCE_BAD' && '⛈️'}{sq.type === 'PROPERTY' && '🏠'}
-              </div>
-              <h2 className="text-3xl font-black text-slate-700 text-center mb-2 drop-shadow-sm">{sq.name}</h2>
-              <div className="text-center text-slate-400 mb-6 text-lg">{sq.desc || (sq.type === 'PROPERTY' ? '一塊棒棒的地產 🌟' : '特殊泡泡 🫧')}</div>
-              
-              {sq.type === 'PROPERTY' && (
-                <div className="flex flex-col gap-3 w-full">
-                  <div className="flex justify-between items-center bg-sky-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm">
-                    <span className="text-sky-800 text-lg">購買需要</span>
-                    <span className="font-black text-sky-600 text-2xl">${sq.price}</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-rose-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm">
-                    <span className="text-rose-800 text-lg">過路費</span>
-                    <span className="font-black text-rose-500 text-2xl">${rentPrice}</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-amber-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm">
-                    <span className="text-amber-800 text-lg">信用門檻</span>
-                    <span className="font-black text-amber-500 text-2xl flex items-center gap-1"><Star size={24} fill="currentColor" /> {sq.reqTrust}</span>
-                  </div>
-                  
-                  <div className="mt-4 p-5 rounded-[2rem] border-[4px] border-dashed border-slate-200 text-center bg-slate-50 relative overflow-hidden">
-                    <div className="text-slate-400 mb-2 text-sm">這塊地的主人是誰呢？</div>
-                    {owner ? (
-                      <div className="font-black text-3xl flex items-center justify-center gap-3">
-                        <span className="text-5xl drop-shadow-md">{owner.icon}</span> <span className="text-emerald-600">{owner.name}</span>
-                      </div>
-                    ) : (
-                      <div className="font-black text-slate-300 text-2xl py-2">目前沒有主人喔 🥺</div>
-                    )}
-                  </div>
-                </div>
-              )}
+      <ActionModal isTradeActive={isTradeActive} tradeBuyer={tradeBuyer} gameData={gameData} myPlayer={myPlayer} tradeBuyerMoney={tradeBuyerMoney} handleRespondTrade={handleRespondTrade} handleThrowBwaBwei={handleThrowBwaBwei} handleFinishBwaBwei={handleFinishBwaBwei} canBuy={canBuy} handleBuyProperty={handleBuyProperty} currentSquare={currentSquare} handleEndTurn={handleEndTurn} activePlayerIndex={activePlayerIndex} />
 
-              {(sq.type === 'TAX' || sq.type === 'START') && (
-                <div className={`flex justify-between items-center p-6 rounded-[2rem] border-4 w-full mt-2 shadow-sm ${sq.type === 'TAX' ? 'bg-rose-100 border-white' : 'bg-emerald-100 border-white'}`}>
-                  <span className={`text-2xl ${sq.type === 'TAX' ? 'text-rose-800' : 'text-emerald-800'}`}>{sq.type === 'TAX' ? '要繳交 💸' : '可領取 💰'}</span>
-                  <span className={`font-black text-4xl ${sq.type === 'TAX' ? 'text-rose-500' : 'text-emerald-500'}`}>${sq.amount || 500}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
-
-      {showAssetManager && myPlayer && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => { setShowAssetManager(false); setSellProcess(null); }}>
-          <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-amber-100 w-[92vw] max-w-md relative pt-14 shadow-2xl animate-in zoom-in-95 font-black" onClick={e=>e.stopPropagation()}>
-              <button onClick={() => { setShowAssetManager(false); setSellProcess(null); }} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3} /></button>
-
-              {!sellProcess ? (
-                 <>
-                  <div className="flex flex-col items-center border-b-4 border-dashed border-amber-100 pb-4 mb-4">
-                      <div className="w-16 h-16 bg-amber-50 rounded-full border-4 border-amber-200 flex items-center justify-center text-4xl mb-2 shadow-inner">💼</div>
-                      <h3 className="font-black text-2xl text-amber-700">小金庫與資產</h3>
-                      {isOfflineMode && <div className="text-amber-500 text-base mt-1">({myPlayer.name} 的包包)</div>}
-                  </div>
-                  
-                  <div className="flex gap-3 mb-5">
-                     <div className="flex-1 bg-emerald-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm flex flex-col items-center relative overflow-hidden">
-                        <div className="absolute -right-2 -bottom-4 text-[4rem] opacity-10">💰</div>
-                        <div className="text-emerald-800 font-bold text-sm mb-1 z-10">目前資金</div>
-                        <div className="font-black text-2xl text-emerald-500 z-10">${myPlayer.money}</div>
-                     </div>
-                     <div className="flex-1 bg-amber-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm flex flex-col items-center relative overflow-hidden">
-                        <div className="absolute -right-2 -bottom-4 text-[4rem] opacity-10">⭐</div>
-                        <div className="text-amber-800 font-bold text-sm mb-1 z-10">目前信用</div>
-                        <div className="font-black text-2xl text-amber-500 z-10 flex items-center gap-1"><Star size={20} fill="currentColor" />{myPlayer.trust}</div>
-                     </div>
-                  </div>
-
-                  <div className="mb-5">
-                      <div className="text-slate-400 mb-2 text-center text-sm font-bold">🌟 拿 1 點信用換零用錢</div>
-                      <button onClick={handleMortgageTrust} disabled={myPlayer.trust <= 1} className={`w-full py-4 rounded-[1.5rem] text-xl shadow-[0_5px_0_0_rgba(0,0,0,0.1)] active:translate-y-[5px] active:shadow-none active:border-b-0 transition-all flex items-center justify-center gap-2 border-[4px] border-white ${myPlayer.trust > 1 ? 'bg-amber-400 text-amber-900 hover:bg-amber-300 cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-                         <Star size={24} fill="currentColor" /> {myPlayer.trust >= 10 ? '換取 $1000' : '換取 $500'}
-                      </button>
-                  </div>
-
-                  <div>
-                      <div className="text-slate-400 mb-3 text-center text-sm font-bold">🏠 變賣手上的地產？</div>
-                      {myProperties.length === 0 ? (
-                          <div className="text-center text-slate-300 text-lg py-8 bg-slate-50 rounded-[2rem] border-4 border-dashed border-slate-200">包包裡空空的 🥺</div>
-                      ) : (
-                          <div className="flex flex-col gap-3 max-h-56 overflow-y-auto pr-2 custom-scrollbar">
-                              {myProperties.map(sqId => {
-                                  const sq = BOARD_SQUARES[sqId];
-                                  if (!sq) return null;
-                                  const sellPrice = myPlayer?.trust >= 10 ? sq.price : Math.floor(sq.price * 0.5);
-                                  return (
-                                      <div key={sqId} className="flex justify-between items-center p-4 bg-sky-50 rounded-[1.5rem] border-4 border-white shadow-sm font-black">
-                                          <span className="font-black text-sky-800 text-xl">{sq.name}</span>
-                                          <button onClick={() => setSellProcess({ sqId, price: sellPrice })} className="bg-rose-400 hover:bg-rose-300 text-white shadow-[0_4px_0_0_#e11d48] active:translate-y-[4px] active:shadow-none text-xl px-5 py-2 rounded-xl transition-all border-2 border-white font-black">變賣</button>
-                                      </div>
-                                  );
-                              })}
-                          </div>
-                      )}
-                  </div>
-                 </>
-              ) : (
-                 <div className="animate-in slide-in-from-right-4 pt-4 font-black">
-                    <button onClick={() => setSellProcess(null)} className="text-sky-500 mb-4 underline font-black">← 返回</button>
-                    <h3 className="text-xl font-black text-slate-700 mb-4 text-center">變賣：{BOARD_SQUARES[sellProcess.sqId].name}</h3>
-                    <div className="bg-amber-50 p-4 rounded-xl mb-6 text-center border-2 border-amber-200">
-                        <div className="text-sm text-slate-500 mb-1">成交價</div>
-                        <div className="text-3xl text-amber-600 font-black">${sellProcess.price}</div>
-                    </div>
-                    <div className="text-xs text-slate-400 mb-3 font-black uppercase tracking-widest">請選擇出售對象：</div>
-                    <div className="flex flex-col gap-3">
-                       <button onClick={() => handleSellToBank(sellProcess.sqId, sellProcess.price)} className="w-full py-4 bg-indigo-500 text-white rounded-2xl border-4 border-white shadow-md active:scale-95 transition-all font-black">🏦 賣給銀行 (立即領錢)</button>
-                       <div className="w-full h-0.5 bg-slate-100 my-1" />
-                       {gameData.players.filter(p => p.id !== activePlayerIndex && !p.isBankrupt && (isOfflineMode || p.uid !== null)).map(p => (
-                          <button key={p.id} onClick={() => initiatePlayerTrade(sellProcess.sqId, sellProcess.price, p.id)} className="w-full py-4 bg-white border-4 border-emerald-100 text-emerald-600 rounded-2xl shadow-sm flex items-center justify-between px-6 active:scale-95 transition-all font-black">
-                              <span>🤝 賣給 {p.name}</span><span className="text-4xl">{p.icon}</span>
-                          </button>
-                       ))}
-                    </div>
-                 </div>
-              )}
-          </div>
-        </div>
-      )}
-
-      {(isTradeActive || (gameData.currentPlayerIdx === activePlayerIndex && myPlayer && !myPlayer.isBankrupt && ['JAIL_BWA_BWEI', 'ACTION', 'END_TURN'].includes(gameData.gameState) && !gameData.pendingTrade)) && (
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[250] bg-white/98 backdrop-blur-md p-8 rounded-[3rem] border-[8px] border-sky-100 shadow-2xl w-[95vw] max-w-[560px] text-center pointer-events-auto flex flex-col items-center gap-6 animate-in zoom-in-95">
-          {isTradeActive ? (
-              tradeBuyer?.isAI ? (
-                 <div className="flex flex-col items-center gap-4 py-8">
-                     <div className="text-6xl animate-bounce mb-4">🤖</div>
-                     <h2 className="text-3xl font-black text-slate-700">{tradeBuyer.name} 思考收購中...</h2><p className="text-slate-500 text-lg">請稍候</p>
-                 </div>
-              ) : (
-                 <>
-                    <div className="bg-emerald-50 p-6 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-2 border-4 border-white shadow-inner text-emerald-500"><Handshake size={48} /></div>
-                    <h2 className="text-3xl font-black text-slate-700">🤝 產權購買邀請</h2>
-                    <p className="text-xl text-slate-500 leading-relaxed font-black">玩家 <span className="text-amber-600">{gameData.players[gameData.pendingTrade.sellerIdx].name}</span> <br/>想以 <span className="text-emerald-500 font-black">${gameData.pendingTrade.price}</span> 出售 <br/><span className="text-sky-600 font-black">{BOARD_SQUARES[gameData.pendingTrade.sqId].name}</span> 給 <span className="text-emerald-600">{tradeBuyer?.name || ''}</span>！</p>
-                    <div className="flex gap-4 w-full">
-                       <button onClick={() => handleRespondTrade(false)} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl border-4 border-white shadow-md font-black text-xl active:scale-95 transition-all">婉拒</button>
-                       <button disabled={tradeBuyerMoney < gameData.pendingTrade.price} onClick={() => handleRespondTrade(true)} className={`flex-1 py-4 rounded-2xl border-4 border-white shadow-lg font-black text-xl active:translate-y-1 transition-all ${tradeBuyerMoney >= gameData.pendingTrade.price ? 'bg-emerald-400 text-white shadow-[0_6px_0_0_#10b981]' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-                         {tradeBuyerMoney < gameData.pendingTrade.price ? '資金不足' : '收購！'}
-                       </button>
-                    </div>
-                 </>
-              )
-          ) : (
-              myPlayer?.isAI ? (
-                 <div className="flex flex-col items-center gap-4 py-8">
-                     <div className="text-6xl animate-bounce mb-4">🤖</div>
-                     <h2 className="text-3xl font-black text-slate-700">{myPlayer.name} 行動中...</h2><p className="text-slate-500 text-lg whitespace-pre-line">{gameData.actionMessage || "請稍候"}</p>
-                 </div>
-              ) : (
-                 <>
-                   {gameData.gameState === 'JAIL_BWA_BWEI' && (
-                     <div className="flex flex-col items-center w-full px-1 md:px-2">
-                       <div className="text-2xl font-black text-rose-500 mb-6 bg-rose-50 px-8 py-3 rounded-full border-4 border-white shadow-sm font-black">🚨 靜心房擲杯判定</div>
-                       <div className="flex gap-4 mb-8">
-                         {[0, 1, 2].map(i => {
-                           const res = (gameData.bwaBweiResults || [])[i];
-                           return (
-                               <div key={i} className={`w-24 h-28 rounded-2xl flex flex-col items-center justify-center border-4 shadow-sm ${res === 'HOLY' ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
-                                 <div className="flex scale-75 mb-2">
-                                    {res === 'HOLY' && <><BweiBlock isFlat={true} className="rotate-12" /><BweiBlock isFlat={false} className="-rotate-12 scale-x-[-1] ml-[-8px]" /></>}
-                                    {res === 'LAUGH' && <><BweiBlock isFlat={true} className="rotate-12" /><BweiBlock isFlat={true} className="-rotate-12 scale-x-[-1] ml-[-8px]" /></>}
-                                    {res === 'YIN' && <><BweiBlock isFlat={false} className="rotate-12" /><BweiBlock isFlat={false} className="-rotate-12 scale-x-[-1] ml-[-8px]" /></>}
-                                 </div>
-                                 <span className="font-black text-sm">{res === 'HOLY' ? '聖杯' : res ? '無杯' : ''}</span>
-                               </div>
-                           );
-                         })}
-                       </div>
-                       {(gameData.bwaBweiResults || []).length < 3 ? <button onClick={handleThrowBwaBwei} className="w-full py-5 bg-rose-400 text-white rounded-[2rem] border-4 border-white shadow-lg text-2xl font-black">🙏 擲杯</button> : <button onClick={handleFinishBwaBwei} className="w-full py-5 bg-emerald-400 text-white rounded-[2rem] border-4 border-white shadow-lg text-2xl animate-bounce font-black">✨ 查看結果</button>}
-                     </div>
-                   )}
-                   {gameData.gameState !== 'JAIL_BWA_BWEI' && <div className="text-3xl leading-relaxed whitespace-pre-line px-4 text-slate-700 font-black">{gameData.actionMessage}</div>}
-                   <div className="flex flex-col gap-4 w-full mt-4 font-black">
-                     {gameData.gameState==='ACTION' && currentSquare?.type==='PROPERTY' && (!gameData.properties || gameData.properties[myPlayer.pos] === undefined) && (
-                       <button onClick={canBuy ? handleBuyProperty : undefined} disabled={!canBuy} className={`py-5 rounded-[2rem] border-4 border-white shadow-lg font-black text-2xl transition-all active:scale-95 ${canBuy ? 'bg-sky-400 text-white shadow-md' : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'}`}>🎁 買下這裡！(${currentSquare.price || 0})</button>
-                     )}
-                     {(gameData.gameState==='ACTION'||gameData.gameState==='END_TURN') && <button onClick={handleEndTurn} className="py-5 bg-amber-400 text-amber-900 rounded-[2rem] border-4 border-white shadow-lg text-2xl font-black active:translate-y-1 transition-all">✅ 結束回合</button>}
-                   </div>
-                 </>
-              )
-          )}
-        </div>
-      )}
+      <AssetManagerModal showAssetManager={showAssetManager} setShowAssetManager={setShowAssetManager} myPlayer={myPlayer} myProperties={myProperties} sellProcess={sellProcess} setSellProcess={setSellProcess} handleMortgageTrust={handleMortgageTrust} handleSellToBank={handleSellToBank} initiatePlayerTrade={initiatePlayerTrade} gameData={gameData} isOfflineMode={isOfflineMode} activePlayerIndex={activePlayerIndex} />
 
       {gameData.gameState === 'ROLLING' && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
@@ -1146,95 +1186,9 @@ export default function App() {
           style={{ width: `${MAP_SIZE}px`, height: `${MAP_SIZE}px`, transform: `translate(${cameraOffset.x + manualOffset.x}px, ${cameraOffset.y + manualOffset.y}px) scale(${displayZoom})` }}
         >
           <div className="w-full h-full p-10 bg-[#fff8e7] rounded-[4rem] shadow-[0_30px_60px_rgba(0,0,0,0.08)] border-[20px] border-[#fde047]" style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gridTemplateRows: 'repeat(11, 1fr)', gap: '10px' }}>
-            {BOARD_SQUARES.map((sq, idx) => {
-                const { row, col } = GRID_ORDER[idx];
-                const ownerId = gameData.properties?.[idx];
-                const owner = ownerId !== undefined ? gameData.players.find(p => p.id === ownerId) : null;
-                const activePlayersHere = gameData.players.filter(p => p.pos === idx && p.uid !== null && !p.isBankrupt);
-                
-                const bodyBg = owner ? getOwnerBodyClass(owner.color) : 'bg-white';
-                const borderClass = owner ? getOwnerBorderClass(owner.color) : 'border-white';
-                const contentClass = `flex-1 flex flex-col items-center justify-center p-2 relative w-full h-full ${bodyBg} z-10`;
-
-                const activePlayerIndexInHere = activePlayersHere.findIndex(ap => gameData.currentPlayerIdx === ap.id);
-                const isMyTurnOnThisCell = activePlayerIndexInHere !== -1 && gameData.currentPlayerIdx === activePlayerIndex;
-
-                return (
-                    <div key={idx} style={{ display: 'contents' }}>
-                        <div onClick={() => { if (!dragStatus.current.moved) setSelectedSquareInfo(idx); }} className={`rounded-[1.5rem] relative flex flex-col overflow-hidden shadow-sm z-10 border-4 border-b-[8px] cursor-pointer hover:scale-[1.03] transition-transform pointer-events-auto ${borderClass}`} style={{ gridRow: row, gridColumn: col }}>
-                            {sq.type === 'PROPERTY' && <div className={`h-[20%] min-h-[20%] w-full ${owner ? owner.color : sq.color} border-b-4 border-white/50 z-0 shrink-0`} />}
-                            <div className={contentClass}>
-                                <span className="font-black text-slate-700 text-2xl leading-tight text-center mt-1 drop-shadow-sm">{sq.name}</span>
-                                {sq.type === 'START' && <span className="text-emerald-700 font-black text-lg leading-tight mt-1 bg-emerald-100 px-3 py-0.5 rounded-full border-2 border-emerald-300">領 $500</span>}
-                                {sq.type === 'TAX' && <span className="text-rose-700 font-black text-lg leading-tight mt-1 bg-rose-100 px-3 py-0.5 rounded-full border-2 border-rose-300">繳 ${sq.amount}</span>}
-                                {sq.price && <span className="text-sky-600 font-black text-xl leading-tight mt-1">${sq.price}</span>}
-                                {sq.reqTrust > 0 && (
-                                  <div className="mt-1 bg-amber-50 text-amber-600 text-xs font-black px-2 py-0.5 rounded-full border-2 border-amber-300 flex items-center justify-center gap-1 shadow-sm">
-                                    <Star size={14} fill="currentColor" /> {sq.reqTrust} 點
-                                  </div>
-                                )}
-                            </div>
-                        </div>
-                        
-                        <div className={`flex items-center justify-center relative ${activePlayerIndexInHere !== -1 ? 'z-[100]' : 'z-20 pointer-events-none'}`} style={{ gridRow: row, gridColumn: col }}>
-                            {activePlayersHere.map((p, pArrayIdx) => {
-                                const isActive = gameData.currentPlayerIdx === p.id;
-                                
-                                let myInactiveIdx = pArrayIdx;
-                                if (activePlayerIndexInHere !== -1 && pArrayIdx > activePlayerIndexInHere) {
-                                    myInactiveIdx = pArrayIdx - 1;
-                                }
-
-                                let tX = 0; let tY = 0;
-                                if (!isActive) {
-                                    const pos = INACTIVE_OFFSETS[myInactiveIdx % INACTIVE_OFFSETS.length];
-                                    tX = pos.x; tY = pos.y;
-                                }
-
-                                return (
-                                    <div key={p.id} className={`absolute transition-all duration-500 ease-out pointer-events-auto flex flex-col items-center ${isActive ? 'z-50' : 'z-10'}`} style={{ transform: `translate(${tX}px, ${tY}px)` }}>
-                                        
-                                        {gameData.gameState === 'MOVING' && gameData.currentPlayerIdx === p.id && gameData.remainingSteps > 0 && (
-                                            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-[150] w-24 flex justify-center">
-                                              <div className="bg-sky-400 border-[6px] border-white text-white font-black rounded-full w-24 h-24 flex items-center justify-center text-[3rem] shadow-[0_10px_20px_rgba(0,0,0,0.15)] animate-bounce">
-                                                {gameData.remainingSteps}
-                                              </div>
-                                            </div>
-                                        )}
-
-                                        {p.inJail && <div className="absolute -top-6 -right-6 text-4xl animate-pulse drop-shadow-md z-40 bg-white p-1 rounded-full border-2 border-slate-100">🙏</div>}
-                                        
-                                        <div onClick={(e) => { if (p.id === activePlayerIndex && (!myPlayer || !myPlayer.isAI)) { e.stopPropagation(); setShowAssetManager(true); } }} className={`w-20 h-20 bg-white rounded-full border-[6px] flex items-center justify-center text-[3rem] shadow-[0_8px_15px_rgba(0,0,0,0.1)] transition-all duration-500 ${isActive ? 'border-amber-400 scale-125 z-40 relative' : 'border-slate-200 scale-[0.65] grayscale opacity-70 z-10'} ${p.id === activePlayerIndex && !p.isAI ? 'cursor-pointer hover:ring-[6px] hover:ring-sky-300 hover:scale-[1.4] hover:grayscale-0 hover:opacity-100' : ''}`}>
-                                            {p.icon}
-                                            {p.id === activePlayerIndex && !p.isBankrupt && (!myPlayer || !myPlayer.isAI) && (
-                                              <div className="absolute -bottom-2 -right-2 bg-amber-400 text-amber-900 p-1.5 rounded-full shadow-md border-4 border-white z-50 animate-bounce">
-                                                 <Briefcase size={18} strokeWidth={3} />
-                                              </div>
-                                            )}
-                                        </div>
-
-                                        {isMyTurnOnThisCell && p.id === activePlayerIndex && !(myPlayer?.isBankrupt) && gameData.gameState === 'IDLE' && !(myPlayer?.inJail) && !isTradeActive && (
-                                            <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 z-[200]">
-                                              <div className="flex flex-col items-center gap-3 animate-in slide-in-from-bottom-4 duration-300" style={{ transform: `scale(${inverseZoom})`, transformOrigin: 'bottom center' }}>
-                                                {myPlayer?.isAI ? (
-                                                    <div className="whitespace-nowrap px-6 py-3 bg-slate-700 text-white rounded-[2rem] font-black text-xl shadow-lg flex items-center gap-2 animate-pulse border-[3px] border-slate-500">
-                                                      🤖 思考中...
-                                                    </div>
-                                                ) : (
-                                                    <button onClick={handleRollDice} className="whitespace-nowrap px-8 py-4 bg-sky-400 hover:bg-sky-300 text-white rounded-[2rem] font-black text-3xl shadow-[0_8px_0_0_#0284c7,0_10px_20px_rgba(0,0,0,0.15)] active:shadow-none active:translate-y-[8px] active:border-b-0 transition-all flex items-center gap-3 border-[4px] border-white animate-bounce">
-                                                      <Dice5 size={32} strokeWidth={3} /> 擲骰子
-                                                    </button>
-                                                )}
-                                              </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                );
-            })}
+            {BOARD_SQUARES.map((sq, idx) => (
+               <MapSquareNode key={idx} sq={sq} idx={idx} gameData={gameData} activePlayerIndex={activePlayerIndex} myPlayer={myPlayer} inverseZoom={inverseZoom} handleRollDice={handleRollDice} setShowAssetManager={setShowAssetManager} setSelectedSquareInfo={setSelectedSquareInfo} isTradeActive={isTradeActive} dragStatus={dragStatus} />
+            ))}
           </div>
         </div>
       </div>
