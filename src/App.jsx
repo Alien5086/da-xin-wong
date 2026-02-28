@@ -78,66 +78,47 @@ const BOARD_SQUARES = [
   { id: 39, name: '自來水廠', type: 'PROPERTY', price: 2000, reqTrust: 15, color: 'bg-slate-300' },
 ];
 
-function createGridOrder() {
-  const order = [];
-  for (let i = 0; i < 40; i++) order.push(null);
-  for (let i = 0; i <= 10; i++) order[i] = { row: 11, col: 11 - i };
-  for (let i = 11; i <= 19; i++) order[i] = { row: 11 - (i - 10), col: 1 };
-  for (let i = 20; i <= 30; i++) order[i] = { row: 1, col: 1 + (i - 20) };
-  for (let i = 31; i <= 39; i++) order[i] = { row: 1 + (i - 30), col: 11 };
-  return order;
-}
-const GRID_ORDER = createGridOrder();
+const GRID_ORDER = Array(40).fill(null);
+for (let i = 0; i <= 10; i++) GRID_ORDER[i] = { row: 11, col: 11 - i };
+for (let i = 11; i <= 19; i++) GRID_ORDER[i] = { row: 11 - (i - 10), col: 1 };
+for (let i = 20; i <= 30; i++) GRID_ORDER[i] = { row: 1, col: 1 + (i - 20) };
+for (let i = 31; i <= 39; i++) GRID_ORDER[i] = { row: 1 + (i - 30), col: 11 };
 
 const CHILD_AVATARS = ['👦', '👧', '👶', '👼', '👲', '👸', '🤴', '🤓', '🤠', '😎', '👻', '👽', '🤖', '👾', '測試', '🐼'];
 
-const formatTime = function(seconds) {
+const formatTime = (seconds) => {
   if (seconds === -1) return "不限時";
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  const sStr = s.toString();
-  return m + ':' + sStr.padStart(2, '0');
+  return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-const checkBankruptcy = function(players) {
+const checkBankruptcy = (players) => {
   let changed = false;
-  const newPlayers = [];
-  for (let i = 0; i < players.length; i++) {
-    const p = players[i];
+  const nextPlayers = players.map(p => {
     if (!p.isBankrupt && (p.money < 0 || p.trust <= 0)) {
       changed = true;
-      const bp = {};
-      for (const k in p) { bp[k] = p[k]; }
-      bp.isBankrupt = true;
-      newPlayers.push(bp);
-    } else {
-      newPlayers.push(p);
+      return Object.assign({}, p, { isBankrupt: true });
     }
-  }
-  return { changed: changed, newPlayers: newPlayers };
+    return p;
+  });
+  return { changed, newPlayers: nextPlayers };
 };
 
-const clearBankruptProperties = function(props, bankruptPlayerIds) {
-  const newProps = {};
+const clearBankruptProperties = (props, bankruptPlayerIds) => {
+  const nextProps = {};
   for (const sqId in props) {
-    let found = false;
-    for (let i = 0; i < bankruptPlayerIds.length; i++) {
-      if (bankruptPlayerIds[i] === props[sqId]) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      newProps[sqId] = props[sqId];
+    if (!bankruptPlayerIds.includes(props[sqId])) {
+      nextProps[sqId] = props[sqId];
     }
   }
-  return newProps;
+  return nextProps;
 };
 
 // =========================================================
 // Firebase 初始化
 // =========================================================
-const getFirebaseConfig = function() {
+const getFirebaseConfig = () => {
   try {
     if (typeof __firebase_config !== 'undefined' && __firebase_config) {
       return JSON.parse(__firebase_config);
@@ -160,11 +141,10 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'da-xin-wong-v1';
-// =========================================================
 
 // 🌟 Web Audio API 音效
 let audioCtx = null;
-const playSound = function(type, isMuted) {
+const playSound = (type, isMuted) => {
   if (isMuted || typeof window === 'undefined') return;
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -196,60 +176,53 @@ const playSound = function(type, isMuted) {
   }
 };
 
-const getOwnerBodyClass = function(colorClass) {
-  if (colorClass === 'bg-sky-300') return 'bg-sky-100';
-  if (colorClass === 'bg-rose-300') return 'bg-rose-100';
-  if (colorClass === 'bg-emerald-300') return 'bg-emerald-100';
-  if (colorClass === 'bg-purple-300') return 'bg-purple-100';
-  if (colorClass === 'bg-orange-300') return 'bg-orange-100';
-  if (colorClass === 'bg-pink-300') return 'bg-pink-100';
-  return 'bg-slate-100';
+const getOwnerBodyClass = (colorClass) => {
+  const map = {
+    'bg-sky-300': 'bg-sky-100', 'bg-rose-300': 'bg-rose-100', 'bg-emerald-300': 'bg-emerald-100',
+    'bg-purple-300': 'bg-purple-100', 'bg-orange-300': 'bg-orange-100', 'bg-pink-300': 'bg-pink-100',
+  };
+  return map[colorClass] || 'bg-slate-100';
 };
 
-const getOwnerBorderClass = function(colorClass) {
-  if (colorClass === 'bg-sky-300') return 'border-sky-300';
-  if (colorClass === 'bg-rose-300') return 'border-rose-300';
-  if (colorClass === 'bg-emerald-300') return 'border-emerald-300';
-  if (colorClass === 'bg-purple-300') return 'border-purple-300';
-  if (colorClass === 'bg-orange-300') return 'border-orange-300';
-  if (colorClass === 'bg-pink-300') return 'border-pink-300';
-  return 'border-slate-300';
+const getOwnerBorderClass = (colorClass) => {
+  const map = {
+    'bg-sky-300': 'border-sky-300', 'bg-rose-300': 'border-rose-300', 'bg-emerald-300': 'border-emerald-300',
+    'bg-purple-300': 'border-purple-300', 'bg-orange-300': 'border-orange-300', 'bg-pink-300': 'border-pink-300',
+  };
+  return map[colorClass] || 'border-slate-300';
 };
 
-// 修正：徹底消除物件展開與內聯函數運算，防堵 AST 解析器崩潰
-const DiceIcon = function({ value, className, style, strokeWidth }) {
+// 避免 AST 綁定問題，簡化組件寫法
+const DiceIcon = ({ value, className, style, strokeWidth }) => {
   const val = value || 1;
-  if (val === 1) return <Dice1 className={className} style={style} strokeWidth={strokeWidth}></Dice1>;
-  if (val === 2) return <Dice2 className={className} style={style} strokeWidth={strokeWidth}></Dice2>;
-  if (val === 3) return <Dice3 className={className} style={style} strokeWidth={strokeWidth}></Dice3>;
-  if (val === 4) return <Dice4 className={className} style={style} strokeWidth={strokeWidth}></Dice4>;
-  if (val === 5) return <Dice5 className={className} style={style} strokeWidth={strokeWidth}></Dice5>;
-  return <Dice6 className={className} style={style} strokeWidth={strokeWidth}></Dice6>;
+  if (val === 1) return <Dice1 className={className} style={style} strokeWidth={strokeWidth} />;
+  if (val === 2) return <Dice2 className={className} style={style} strokeWidth={strokeWidth} />;
+  if (val === 3) return <Dice3 className={className} style={style} strokeWidth={strokeWidth} />;
+  if (val === 4) return <Dice4 className={className} style={style} strokeWidth={strokeWidth} />;
+  if (val === 5) return <Dice5 className={className} style={style} strokeWidth={strokeWidth} />;
+  return <Dice6 className={className} style={style} strokeWidth={strokeWidth} />;
 };
 
-// 🌟 擬真 3D 半月筊杯組件
-const BweiBlock = function({ isFlat, className }) {
+const BweiBlock = ({ isFlat, className }) => {
   if (isFlat) {
       return (
         <div className={`relative ${className || ""}`}>
           <div className="w-[32px] h-[75px] bg-[#fb7185] border-[2px] border-[#e11d48] rounded-r-[40px] rounded-l-[6px] shadow-inner drop-shadow-md relative overflow-hidden">
-             <div className="absolute top-1 bottom-1 left-1 right-2 bg-[#fda4af] rounded-r-[30px] rounded-l-[4px] opacity-90"></div>
-          </div>
-        </div>
-      );
-  } else {
-      return (
-        <div className={`relative ${className || ""}`}>
-          <div className="w-[32px] h-[75px] bg-[#be123c] border-[2px] border-[#881337] rounded-r-[40px] rounded-l-[6px] shadow-[inset_-6px_0_10px_rgba(0,0,0,0.5)] drop-shadow-xl relative overflow-hidden">
-             <div className="absolute top-2 bottom-2 right-1.5 w-[6px] bg-white/40 rounded-full blur-[2px]"></div>
-             <div className="absolute top-4 bottom-4 right-2.5 w-[2px] bg-white/60 rounded-full blur-[0.5px]"></div>
+             <div className="absolute top-1 bottom-1 left-1 right-2 bg-[#fda4af] rounded-r-[30px] rounded-l-[4px] opacity-90" />
           </div>
         </div>
       );
   }
+  return (
+    <div className={`relative ${className || ""}`}>
+      <div className="w-[32px] h-[75px] bg-[#be123c] border-[2px] border-[#881337] rounded-r-[40px] rounded-l-[6px] shadow-[inset_-6px_0_10px_rgba(0,0,0,0.5)] drop-shadow-xl relative overflow-hidden">
+         <div className="absolute top-2 bottom-2 right-1.5 w-[6px] bg-white/40 rounded-full blur-[2px]" />
+         <div className="absolute top-4 bottom-4 right-2.5 w-[2px] bg-white/60 rounded-full blur-[0.5px]" />
+      </div>
+    </div>
+  );
 };
 
-// --- 主程式組件 ---
 export default function App() {
   const [appPhase, setAppPhase] = useState('LANDING'); 
   
@@ -274,7 +247,6 @@ export default function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   
-  // 右下角選單開關狀態
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const bgmRef = useRef(null);
@@ -290,7 +262,7 @@ export default function App() {
 
   const [displayDice, setDisplayDice] = useState([1, 1]);
   const [showAssetManager, setShowAssetManager] = useState(false); 
-  const [sellProcess, setSellProcess] = useState(null); // 變賣程序狀態
+  const [sellProcess, setSellProcess] = useState(null); 
   const [localTimeLeft, setLocalTimeLeft] = useState(0); 
 
   const [zoom, setZoom] = useState(0.85);
@@ -303,34 +275,22 @@ export default function App() {
   const mapRef = useRef(null);
   const MAP_SIZE = 1900; 
 
-  // --- 🌟 核心變數安全讀取 ---
   const activePlayerIndex = isOfflineMode ? gameData.currentPlayerIdx : (myPlayerIndex !== null ? myPlayerIndex : 0);
-  const myPlayer = gameData.players && gameData.players[activePlayerIndex] ? gameData.players[activePlayerIndex] : null;
-  const currentSquare = myPlayer && myPlayer.pos !== undefined ? BOARD_SQUARES[myPlayer.pos] : null;
+  const myPlayer = gameData.players[activePlayerIndex] || null;
+  const currentSquare = myPlayer?.pos !== undefined ? BOARD_SQUARES[myPlayer.pos] : null;
   
-  const myMoney = Number((myPlayer && myPlayer.money) || 0);
-  const myTrust = Number((myPlayer && myPlayer.trust) || 0);
-  const reqMoney = Number((currentSquare && currentSquare.price) || 0);
-  const reqTrust = Number((currentSquare && currentSquare.reqTrust) || 0);
+  const myMoney = Number(myPlayer?.money || 0);
+  const myTrust = Number(myPlayer?.trust || 0);
+  const reqMoney = Number(currentSquare?.price || 0);
+  const reqTrust = Number(currentSquare?.reqTrust || 0);
   
-  let displayZoom = zoom;
-  if (isFullMapMode) {
-      const wRatio = viewportSize.w / MAP_SIZE;
-      const hRatio = viewportSize.h / MAP_SIZE;
-      const minRatio = Math.min(wRatio, hRatio);
-      displayZoom = minRatio * 0.9;
-  }
+  const displayZoom = isFullMapMode ? Math.min(viewportSize.w / MAP_SIZE, viewportSize.h / MAP_SIZE) * 0.9 : zoom;
   const inverseZoom = 1 / displayZoom; 
   const canBuy = Boolean(currentSquare && myMoney >= reqMoney && myTrust >= reqTrust);
   
-  const myProperties = [];
-  if (myPlayer && gameData.properties) {
-      for (const sqId in gameData.properties) {
-          if (gameData.properties[sqId] === activePlayerIndex) {
-              myProperties.push(Number(sqId));
-          }
-      }
-  }
+  const myProperties = Object.keys(gameData.properties || {})
+    .filter(sqId => gameData.properties[sqId] === activePlayerIndex)
+    .map(Number);
 
   const safeDice = displayDice || [1, 1];
 
@@ -339,14 +299,9 @@ export default function App() {
   const tradeBuyerMoney = tradeBuyer ? Number(tradeBuyer.money || 0) : 0;
 
   // --- 邏輯函數 ---
-  const syncGameData = useCallback(async function(updates) {
+  const syncGameData = useCallback(async (updates) => {
     if (isOfflineMode) {
-        setGameData(function(prev) {
-            const nextState = {};
-            for (const key in prev) { nextState[key] = prev[key]; }
-            for (const key in updates) { nextState[key] = updates[key]; }
-            return nextState;
-        });
+        setGameData(prev => Object.assign({}, prev, updates));
     } else {
         if (!auth.currentUser) return;
         try {
@@ -522,22 +477,18 @@ export default function App() {
     playSound('win', isMuted); 
     setIsOfflineMode(true);
     
-    const players = [];
-    for (let i = 0; i < setupPlayerCount; i++) {
-      const pName = (localNames[i] || '').trim() || `玩家 ${i + 1}`;
-      players.push({
-        id: i, 
-        name: pName,
-        icon: localAvatars[i], 
-        color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
-        pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
-        inJail: false, jailRoundsLeft: 0, isBankrupt: false,
-        uid: `local_player_${i}`, isAI: localPlayerTypes[i] === 'AI'
-      });
-    }
+    const initialPlayers = Array.from({ length: setupPlayerCount }).map((_, i) => ({
+      id: i, 
+      name: (localNames[i] || '').trim() || `玩家 ${i + 1}`,
+      icon: localAvatars[i], 
+      color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
+      pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
+      inJail: false, jailRoundsLeft: 0, isBankrupt: false,
+      uid: `local_player_${i}`, isAI: localPlayerTypes[i] === 'AI'
+    }));
     
     setGameData({
-      players: players, 
+      players: initialPlayers, 
       currentPlayerIdx: 0, 
       gameState: 'IDLE', 
       roomId: 'LOCAL', 
@@ -559,27 +510,22 @@ export default function App() {
     playSound('win', isMuted); 
     setIsOfflineMode(false);
     const rStr = Math.random().toString(36);
-    const subStr = rStr.substring(2, 8);
-    const id = subStr.toUpperCase();
+    const id = rStr.substring(2, 8).toUpperCase();
     
-    const players = [];
-    for (let i = 0; i < setupPlayerCount; i++) {
-      const pName = i === 0 ? ((setupName || '').trim() || '房主') : `玩家 ${i + 1}`;
-      players.push({
-        id: i, 
-        name: pName,
-        icon: i === 0 ? setupAvatar : '⏳', 
-        color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
-        pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
-        inJail: false, jailRoundsLeft: 0, isBankrupt: false,
-        uid: i === 0 ? user.uid : null 
-      });
-    }
+    const initialPlayers = Array.from({ length: setupPlayerCount }).map((_, i) => ({
+      id: i, 
+      name: i === 0 ? ((setupName || '').trim() || '房主') : `玩家 ${i + 1}`,
+      icon: i === 0 ? setupAvatar : '⏳', 
+      color: ['bg-sky-300', 'bg-rose-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-pink-300'][i % 6],
+      pos: 0, money: BASE_MONEY, trust: BASE_TRUST, 
+      inJail: false, jailRoundsLeft: 0, isBankrupt: false,
+      uid: i === 0 ? user.uid : null 
+    }));
     
     try {
       const roomDoc = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id);
       await setDoc(roomDoc, {
-        players: players, 
+        players: initialPlayers, 
         currentPlayerIdx: 0, 
         gameState: 'IDLE', 
         roomId: id, 
@@ -605,13 +551,7 @@ export default function App() {
       if (!snap.exists()) { setErrorMsg("找不到房號！"); return; }
       const data = snap.data();
       
-      let existingSlot = -1;
-      let emptySlot = -1;
-      for (let i = 0; i < data.players.length; i++) {
-          if (data.players[i].uid === user.uid) existingSlot = i;
-          if (data.players[i].uid === null && emptySlot === -1) emptySlot = i;
-      }
-
+      const existingSlot = data.players.findIndex(p => p.uid === user.uid);
       if (existingSlot !== -1) {
         setMyPlayerIndex(existingSlot);
         setAppPhase('GAME');
@@ -619,14 +559,19 @@ export default function App() {
         return;
       }
 
+      const emptySlot = data.players.findIndex(p => p.uid === null);
       if (emptySlot === -1) { setErrorMsg("房間已滿！"); return; }
       
-      data.players[emptySlot].uid = user.uid;
-      data.players[emptySlot].icon = setupAvatar;
-      data.players[emptySlot].name = setupName.trim() || `玩家 ${emptySlot + 1}`;
-      data.players[emptySlot].inJail = false; 
+      const nextPlayers = data.players.slice();
+      nextPlayers[emptySlot] = Object.assign({}, nextPlayers[emptySlot], {
+          uid: user.uid,
+          icon: setupAvatar,
+          name: setupName.trim() || `玩家 ${emptySlot + 1}`,
+          inJail: false
+      });
       
-      await updateDoc(roomDoc, { players: data.players });
+      const updates = { players: nextPlayers };
+      await updateDoc(roomDoc, updates);
       setMyPlayerIndex(emptySlot); setAppPhase('GAME');
       if (data.timeLeft !== -1) setLocalTimeLeft(data.timeLeft);
     } catch (e) { setErrorMsg("加入失敗。"); }
@@ -634,31 +579,22 @@ export default function App() {
 
   const handleRollDice = async () => {
     if (gameData.currentPlayerIdx !== activePlayerIndex) return;
-
     playSound('roll', isMuted); 
-
-    const r1 = Math.random();
-    const d1 = Math.floor(r1 * 6) + 1;
-    const r2 = Math.random();
-    const d2 = Math.floor(r2 * 6) + 1;
-    const steps = d1 + d2;
-
-    await syncGameData({
+    const d1 = Math.floor(Math.random() * 6) + 1;
+    const d2 = Math.floor(Math.random() * 6) + 1;
+    const updates = {
       diceVals: [d1, d2],
-      remainingSteps: steps,
+      remainingSteps: d1 + d2,
       gameState: 'ROLLING', 
       actionMessage: ''
-    });
+    };
+    await syncGameData(updates);
   };
 
   useEffect(() => {
     if (gameData.gameState === 'ROLLING') {
       const interval = setInterval(() => {
-        const r1 = Math.random();
-        const v1 = Math.floor(r1 * 6) + 1;
-        const r2 = Math.random();
-        const v2 = Math.floor(r2 * 6) + 1;
-        setDisplayDice([v1, v2]);
+        setDisplayDice([Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1]);
       }, 100);
       return () => clearInterval(interval);
     } else {
@@ -670,16 +606,15 @@ export default function App() {
     if (appPhase !== 'GAME') return;
     if (gameData.gameState === 'ROLLING' && gameData.currentPlayerIdx === activePlayerIndex) {
       const timer = setTimeout(async () => {
-        await syncGameData({ gameState: 'MOVING' });
+        const updates = { gameState: 'MOVING' };
+        await syncGameData(updates);
       }, 600); 
       return () => clearTimeout(timer);
     }
-  }, [gameData.gameState, gameData.currentPlayerIdx, activePlayerIndex, roomId, isOfflineMode, syncGameData]);
+  }, [gameData.gameState, gameData.currentPlayerIdx, activePlayerIndex, roomId, isOfflineMode, syncGameData, appPhase]);
 
   useEffect(() => {
-    if (appPhase !== 'GAME') return;
-    if (gameData.gameState !== 'MOVING') return;
-    if (gameData.currentPlayerIdx !== activePlayerIndex) return;
+    if (appPhase !== 'GAME' || gameData.gameState !== 'MOVING' || gameData.currentPlayerIdx !== activePlayerIndex) return;
 
     const moveTimer = setTimeout(async () => {
       try {
@@ -697,22 +632,15 @@ export default function App() {
             msg = '✨ 經過起點，領取 $500 零用錢！\n';
           }
           
-          const newPlayers = [];
-          for (let i = 0; i < gameData.players.length; i++) {
-              newPlayers.push(gameData.players[i]);
-          }
+          const nextPlayers = gameData.players.slice();
+          nextPlayers[activePlayerIndex] = Object.assign({}, player, { pos: newPos, money: newMoney });
 
-          const pCopy = {};
-          for (const k in player) { pCopy[k] = player[k]; }
-          pCopy.pos = newPos;
-          pCopy.money = newMoney;
-          newPlayers[activePlayerIndex] = pCopy;
-
-          await syncGameData({
-            players: newPlayers,
+          const updates = {
+            players: nextPlayers,
             remainingSteps: gameData.remainingSteps - 1,
             actionMessage: msg
-          });
+          };
+          await syncGameData(updates);
         } else {
           await handleLandOnSquare();
         }
@@ -730,10 +658,8 @@ export default function App() {
     let nextState = 'ACTION';
     let msg = gameData.actionMessage || '';
     
-    const newPlayers = [];
-    for (let i = 0; i < gameData.players.length; i++) {
-        newPlayers.push(gameData.players[i]);
-    }
+    const nextPlayers = gameData.players.slice();
+    const currPlayerClone = Object.assign({}, nextPlayers[activePlayerIndex]);
 
     if (sq.type === 'START') {
       playSound('coin', isMuted); 
@@ -741,47 +667,46 @@ export default function App() {
       nextState = 'END_TURN';
     } else if (sq.type === 'TAX') {
       playSound('bad', isMuted); 
-      newPlayers[activePlayerIndex].money -= sq.amount;
+      currPlayerClone.money -= sq.amount;
       msg += `💸 繳納 ${sq.name} $${sq.amount}！`;
       nextState = 'END_TURN';
     } else if (sq.type === 'CHANCE_GOOD' || sq.type === 'CHANCE_BAD') {
       const cardPool = sq.type === 'CHANCE_GOOD' ? GOOD_CARDS : BAD_CARDS;
-      const r = Math.random();
-      const cardIdx = Math.floor(r * cardPool.length);
+      const cardIdx = Math.floor(Math.random() * cardPool.length);
       const card = cardPool[cardIdx];
       
       msg += `【 ${card.desc} 】\n\n`;
       if (card.goToJail) {
          playSound('bad', isMuted); 
-         newPlayers[activePlayerIndex].pos = 10;
-         newPlayers[activePlayerIndex].inJail = true;
-         newPlayers[activePlayerIndex].jailRoundsLeft = -1; 
+         currPlayerClone.pos = 10;
+         currPlayerClone.inJail = true;
+         currPlayerClone.jailRoundsLeft = -1; 
          msg += `好好的懺悔反省 🙏\n請誠心擲杯問神明。`;
          nextState = 'JAIL_BWA_BWEI'; 
       } else {
          if (card.effectM > 0 || card.effectT > 0) playSound('win', isMuted); 
          else playSound('bad', isMuted); 
-         newPlayers[activePlayerIndex].money += card.effectM;
-         newPlayers[activePlayerIndex].trust += card.effectT;
+         currPlayerClone.money += card.effectM;
+         currPlayerClone.trust += card.effectT;
          msg += `資金 ${card.effectM > 0 ? '+'+card.effectM : card.effectM}\n信用 ${card.effectT > 0 ? '+'+card.effectT : card.effectT}`;
       }
       if (!card.goToJail) nextState = 'END_TURN';
     } else if (sq.type === 'GO_TO_JAIL' || sq.id === 30 || sq.type === 'JAIL' || sq.id === 10) {
       playSound('bad', isMuted); 
-      newPlayers[activePlayerIndex].pos = 10;
-      newPlayers[activePlayerIndex].inJail = true;
-      newPlayers[activePlayerIndex].jailRoundsLeft = -1; 
+      currPlayerClone.pos = 10;
+      currPlayerClone.inJail = true;
+      currPlayerClone.jailRoundsLeft = -1; 
       msg += `好好的懺悔反省 🙏\n請誠心擲杯問神明。`;
       nextState = 'JAIL_BWA_BWEI'; 
     } else if (sq.type === 'PROPERTY') {
       const ownerId = gameData.properties ? gameData.properties[sq.id] : undefined;
       if (ownerId !== undefined && ownerId !== activePlayerIndex) {
-        const owner = newPlayers[ownerId];
+        const owner = nextPlayers[ownerId];
         if (!owner.inJail && !owner.isBankrupt) { 
            playSound('bad', isMuted); 
            const rent = Math.floor(sq.price * 0.4);
-           newPlayers[activePlayerIndex].money -= rent;
-           newPlayers[ownerId].money += rent;
+           currPlayerClone.money -= rent;
+           nextPlayers[ownerId] = Object.assign({}, nextPlayers[ownerId], { money: nextPlayers[ownerId].money + rent });
            msg += `踩到 ${owner.name} 的地盤，\n付過路費 $${rent} 給他吧！`;
         } else {
            playSound('win', isMuted); 
@@ -806,37 +731,36 @@ export default function App() {
       nextState = 'END_TURN';
     }
 
-    const bankruptCheck = checkBankruptcy(newPlayers);
-    if (bankruptCheck.changed && bankruptCheck.newPlayers[activePlayerIndex].isBankrupt) {
+    nextPlayers[activePlayerIndex] = currPlayerClone;
+
+    const { changed, newPlayers: bankruptPlayers } = checkBankruptcy(nextPlayers);
+    if (changed && bankruptPlayers[activePlayerIndex].isBankrupt) {
        playSound('bad', isMuted); 
        msg += `\n\n🚨 哎呀！資金或信用歸零，你出局了！`;
        nextState = 'END_TURN';
     }
 
-    let updatedProperties = gameData.properties;
-    if (bankruptCheck.changed) {
-        const bankruptIds = [];
-        for (let i = 0; i < bankruptCheck.newPlayers.length; i++) {
-            if (bankruptCheck.newPlayers[i].isBankrupt) {
-                bankruptIds.push(bankruptCheck.newPlayers[i].id);
-            }
-        }
-        updatedProperties = clearBankruptProperties(gameData.properties, bankruptIds);
+    let nextProps = gameData.properties;
+    if (changed) {
+        const bankruptIds = bankruptPlayers.filter(p => p.isBankrupt).map(p => p.id);
+        nextProps = clearBankruptProperties(gameData.properties, bankruptIds);
     }
 
-    await syncGameData({
-      players: bankruptCheck.newPlayers,
-      properties: updatedProperties,
+    const updates = {
+      players: bankruptPlayers,
+      properties: nextProps,
       gameState: nextState,
       actionMessage: msg,
       bwaBweiResults: [] 
-    });
+    };
+    await syncGameData(updates);
   };
 
   const handleThrowBwaBwei = async () => {
     if (gameData.currentPlayerIdx !== activePlayerIndex) return;
     playSound('bwa', isMuted); 
-    await syncGameData({ gameState: 'BWA_BWEI_ROLLING' });
+    const updates = { gameState: 'BWA_BWEI_ROLLING' };
+    await syncGameData(updates);
   };
 
   useEffect(() => {
@@ -849,55 +773,46 @@ export default function App() {
         else if (rand < 0.75) res = 'LAUGH'; 
         else res = 'YIN'; 
 
-        const newResults = [];
-        if (gameData.bwaBweiResults) {
-            for (let i = 0; i < gameData.bwaBweiResults.length; i++) {
-                newResults.push(gameData.bwaBweiResults[i]);
-            }
-        }
-        newResults.push(res);
+        const nextResults = (gameData.bwaBweiResults || []).slice();
+        nextResults.push(res);
         
-        await syncGameData({ 
-          gameState: 'JAIL_BWA_BWEI',
-          bwaBweiResults: newResults
-        });
+        const updates = { gameState: 'JAIL_BWA_BWEI', bwaBweiResults: nextResults };
+        await syncGameData(updates);
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [gameData.gameState, gameData.currentPlayerIdx, activePlayerIndex, gameData.bwaBweiResults, isOfflineMode, roomId, syncGameData]);
+  }, [gameData.gameState, gameData.currentPlayerIdx, activePlayerIndex, gameData.bwaBweiResults, isOfflineMode, roomId, syncGameData, appPhase]);
 
   const handleFinishBwaBwei = async () => {
-    const newPlayers = [];
-    for (let i = 0; i < gameData.players.length; i++) {
-        newPlayers.push(gameData.players[i]);
-    }
+    const nextPlayers = gameData.players.slice();
+    const currPlayerClone = Object.assign({}, nextPlayers[activePlayerIndex]);
     
-    let holyCount = 0;
     const results = gameData.bwaBweiResults || [];
-    for (let i = 0; i < results.length; i++) {
-        if (results[i] === 'HOLY') holyCount++;
-    }
+    const holyCount = results.filter(r => r === 'HOLY').length;
     
     let msg = `總共擲出【 ${holyCount} 次聖杯 】\n`;
     if (holyCount === 3) {
       playSound('win', isMuted); 
-      newPlayers[activePlayerIndex].jailRoundsLeft = 0;
-      newPlayers[activePlayerIndex].money -= 500;
-      newPlayers[activePlayerIndex].inJail = false;
+      currPlayerClone.jailRoundsLeft = 0;
+      currPlayerClone.money -= 500;
+      currPlayerClone.inJail = false;
       msg += `✨ 神明原諒你了！(繳交罰款 $500)\n你重獲自由，下回合可正常玩囉！`;
     } else {
       playSound('bad', isMuted); 
       const waitRounds = 3 - holyCount; 
-      newPlayers[activePlayerIndex].jailRoundsLeft = waitRounds;
+      currPlayerClone.jailRoundsLeft = waitRounds;
       msg += `神明要你繼續反省...\n需在泡泡裡等待 ${waitRounds} 輪。`;
     }
     
-    await syncGameData({
-      players: newPlayers,
+    nextPlayers[activePlayerIndex] = currPlayerClone;
+
+    const updates = {
+      players: nextPlayers,
       gameState: 'END_TURN', 
       actionMessage: msg,
       bwaBweiResults: [] 
-    });
+    };
+    await syncGameData(updates);
   };
 
   const handleBuyProperty = async () => {
@@ -907,23 +822,19 @@ export default function App() {
       
       if (myMoney >= reqMoney && myTrust >= reqTrust) {
         playSound('coin', isMuted); 
-        const newPlayers = [];
-        for (let i = 0; i < gameData.players.length; i++) {
-            newPlayers.push(gameData.players[i]);
-        }
-        newPlayers[activePlayerIndex].money -= reqMoney;
+        const nextPlayers = gameData.players.slice();
+        nextPlayers[activePlayerIndex] = Object.assign({}, player, { money: player.money - reqMoney });
 
-        const currentProps = gameData.properties || {};
-        const newProps = {};
-        for (const k in currentProps) { newProps[k] = currentProps[k]; }
-        newProps[sq.id] = player.id;
+        const nextProps = Object.assign({}, gameData.properties);
+        nextProps[sq.id] = player.id;
 
-        await syncGameData({
-          players: newPlayers,
-          properties: newProps,
+        const updates = {
+          players: nextPlayers,
+          properties: nextProps,
           gameState: 'END_TURN',
           actionMessage: `🎉 成功買下 ${sq.name} 囉！`
-        });
+        };
+        await syncGameData(updates);
       }
     } catch(e) {
       console.error("Buy property error:", e);
@@ -932,26 +843,22 @@ export default function App() {
 
   const handleSellToBank = useCallback(async (sqId, price) => {
     playSound('coin', isMuted); 
-    const newPlayers = [];
-    for (let i = 0; i < gameData.players.length; i++) {
-        newPlayers.push(gameData.players[i]);
-    }
-    newPlayers[activePlayerIndex].money += price;
+    const nextPlayers = gameData.players.slice();
+    const currPlayer = nextPlayers[activePlayerIndex];
+    nextPlayers[activePlayerIndex] = Object.assign({}, currPlayer, { money: currPlayer.money + price });
     
-    const newProps = {};
-    for (const key in gameData.properties) {
-        if (Number(key) !== Number(sqId)) {
-            newProps[key] = gameData.properties[key];
-        }
-    }
+    const nextProps = Object.assign({}, gameData.properties);
+    delete nextProps[sqId];
 
-    await syncGameData({ players: newPlayers, properties: newProps });
+    const updates = { players: nextPlayers, properties: nextProps };
+    await syncGameData(updates);
     setSellProcess(null);
   }, [gameData.players, gameData.properties, activePlayerIndex, isMuted, syncGameData]);
 
   const initiatePlayerTrade = useCallback(async (sqId, price, buyerIdx) => {
     playSound('click', isMuted);
-    await syncGameData({ pendingTrade: { sellerIdx: activePlayerIndex, buyerIdx: buyerIdx, sqId: sqId, price: price } });
+    const updates = { pendingTrade: { sellerIdx: activePlayerIndex, buyerIdx: buyerIdx, sqId: sqId, price: price } };
+    await syncGameData(updates);
     setSellProcess(null);
     setShowAssetManager(false);
   }, [activePlayerIndex, isMuted, syncGameData]);
@@ -961,19 +868,21 @@ export default function App() {
     const trade = gameData.pendingTrade;
     if (accept) {
         playSound('coin', isMuted);
-        const newPlayers = [];
-        for (let i = 0; i < gameData.players.length; i++) {
-            newPlayers.push(gameData.players[i]);
-        }
-        newPlayers[trade.sellerIdx].money += trade.price;
-        newPlayers[trade.buyerIdx].money -= trade.price;
-        const newProps = {};
-        for (const k in gameData.properties) { newProps[k] = gameData.properties[k]; }
-        newProps[trade.sqId] = trade.buyerIdx;
-        await syncGameData({ players: newPlayers, properties: newProps, pendingTrade: null });
+        const nextPlayers = gameData.players.slice();
+        const sP = nextPlayers[trade.sellerIdx];
+        const bP = nextPlayers[trade.buyerIdx];
+        nextPlayers[trade.sellerIdx] = Object.assign({}, sP, { money: sP.money + trade.price });
+        nextPlayers[trade.buyerIdx] = Object.assign({}, bP, { money: bP.money - trade.price });
+        
+        const nextProps = Object.assign({}, gameData.properties);
+        nextProps[trade.sqId] = trade.buyerIdx;
+        
+        const updates = { players: nextPlayers, properties: nextProps, pendingTrade: null };
+        await syncGameData(updates);
     } else {
         playSound('click', isMuted);
-        await syncGameData({ pendingTrade: null });
+        const updates = { pendingTrade: null };
+        await syncGameData(updates);
     }
   }, [gameData.players, gameData.properties, gameData.pendingTrade, isMuted, syncGameData]);
 
@@ -984,94 +893,76 @@ export default function App() {
          
          playSound('coin', isMuted); 
 
-         const isHighTrust = player.trust >= 10;
-         const exchangeRate = isHighTrust ? 1000 : 500;
+         const exchangeRate = player.trust >= 10 ? 1000 : 500;
 
-         const newPlayers = [];
-         for (let i = 0; i < gameData.players.length; i++) {
-             newPlayers.push(gameData.players[i]);
-         }
-         newPlayers[activePlayerIndex].trust -= 1;
-         newPlayers[activePlayerIndex].money += exchangeRate;
-
-         await syncGameData({
-             players: newPlayers
+         const nextPlayers = gameData.players.slice();
+         nextPlayers[activePlayerIndex] = Object.assign({}, player, {
+             trust: player.trust - 1,
+             money: player.money + exchangeRate
          });
+
+         const updates = { players: nextPlayers };
+         await syncGameData(updates);
      } catch(e) {}
   };
 
   const handleEndTurn = async () => {
     try {
       playSound('click', isMuted); 
-      const newPlayers = [];
-      for (let i = 0; i < gameData.players.length; i++) {
-          newPlayers.push(gameData.players[i]);
-      }
+      const nextPlayers = gameData.players.slice();
       let nextIdx = gameData.currentPlayerIdx;
       
       let attempts = 0;
       do {
-          nextIdx = (nextIdx + 1) % newPlayers.length;
+          nextIdx = (nextIdx + 1) % nextPlayers.length;
           attempts++;
-      } while (newPlayers[nextIdx].isBankrupt && attempts < 10);
+      } while (nextPlayers[nextIdx].isBankrupt && attempts < 10);
 
-      let nextPlayer = newPlayers[nextIdx];
+      const nextPlayer = nextPlayers[nextIdx];
+      const nextPlayerClone = Object.assign({}, nextPlayer);
       let nextState = 'IDLE';
       let msg = '';
 
-      if (nextPlayer.inJail && nextPlayer.jailRoundsLeft > 0) {
-          nextPlayer.jailRoundsLeft -= 1;
-          
-          if (nextPlayer.jailRoundsLeft === 0) {
-              nextPlayer.money -= 500;
-              nextPlayer.inJail = false;
-              msg = `🌟 ${nextPlayer.name} 反省期滿，扣除罰金 $500。\n離開反省泡泡，可正常行動囉！`;
+      if (nextPlayerClone.inJail && nextPlayerClone.jailRoundsLeft > 0) {
+          nextPlayerClone.jailRoundsLeft -= 1;
+          if (nextPlayerClone.jailRoundsLeft === 0) {
+              nextPlayerClone.money -= 500;
+              nextPlayerClone.inJail = false;
+              msg = `🌟 ${nextPlayerClone.name} 反省期滿，扣除罰金 $500。\n離開反省泡泡，可正常行動囉！`;
           } else {
               nextState = 'END_TURN'; 
-              msg = `🔒 ${nextPlayer.name} 仍在反省泡泡中...\n(還要等 ${nextPlayer.jailRoundsLeft} 輪喔)`;
+              msg = `🔒 ${nextPlayerClone.name} 仍在反省泡泡中...\n(還要等 ${nextPlayerClone.jailRoundsLeft} 輪喔)`;
           }
       }
+      nextPlayers[nextIdx] = nextPlayerClone;
 
-      const bankruptCheck = checkBankruptcy(newPlayers);
-      if (bankruptCheck.newPlayers[nextIdx].isBankrupt && nextPlayer.inJail === false) {
+      const { changed, newPlayers: bankruptPlayers } = checkBankruptcy(nextPlayers);
+      if (bankruptPlayers[nextIdx].isBankrupt && nextPlayerClone.inJail === false) {
           msg += `\n🚨 資金或信用歸零，宣告破產！`;
           nextState = 'END_TURN';
       }
 
-      let joinedPlayersCount = 0;
-      let alivePlayersCount = 0;
-      for (let i = 0; i < bankruptCheck.newPlayers.length; i++) {
-          const p = bankruptCheck.newPlayers[i];
-          if (isOfflineMode || p.uid !== null) {
-              joinedPlayersCount++;
-              if (!p.isBankrupt) {
-                  alivePlayersCount++;
-              }
-          }
-      }
+      const activePlayersCount = bankruptPlayers.filter(p => (isOfflineMode || p.uid !== null)).length;
+      const alivePlayersCount = bankruptPlayers.filter(p => (isOfflineMode || p.uid !== null) && !p.isBankrupt).length;
       
-      if (joinedPlayersCount > 1 && alivePlayersCount <= 1) {
+      if (activePlayersCount > 1 && alivePlayersCount <= 1) {
           nextState = 'GAME_OVER';
       }
 
-      let updatedProperties = gameData.properties;
-      if (bankruptCheck.changed) {
-          const bankruptIds = [];
-          for (let i = 0; i < bankruptCheck.newPlayers.length; i++) {
-              if (bankruptCheck.newPlayers[i].isBankrupt) {
-                  bankruptIds.push(bankruptCheck.newPlayers[i].id);
-              }
-          }
-          updatedProperties = clearBankruptProperties(gameData.properties, bankruptIds);
+      let nextProps = gameData.properties;
+      if (changed) {
+          const bankruptIds = bankruptPlayers.filter(p => p.isBankrupt).map(p => p.id);
+          nextProps = clearBankruptProperties(gameData.properties, bankruptIds);
       }
 
-      await syncGameData({
-        players: bankruptCheck.newPlayers,
-        properties: updatedProperties,
+      const updates = {
+        players: bankruptPlayers,
+        properties: nextProps,
         currentPlayerIdx: nextIdx,
         gameState: nextState,
         actionMessage: msg
-      });
+      };
+      await syncGameData(updates);
     } catch(e) { console.error("End turn error", e); }
   };
 
@@ -1094,14 +985,34 @@ export default function App() {
     if (currAI && currAI.isAI) {
         let tId; const { gameState } = gameData;
         if (!currAI.isBankrupt || gameState === 'END_TURN') {
-            if (gameState === 'IDLE') { tId = setTimeout(() => { if (currAI.jailRoundsLeft === -1) { syncGameData({ gameState: 'JAIL_BWA_BWEI', bwaBweiResults: [] }); } else { handleRollDice(); } }, 1200); }
-            else if (gameState === 'JAIL_BWA_BWEI') { tId = setTimeout(() => { if ((gameData.bwaBweiResults || []).length < 3) { handleThrowBwaBwei(); } else { handleFinishBwaBwei(); } }, 1200); }
-            else if (gameState === 'ACTION') { tId = setTimeout(() => {
-                const sq = BOARD_SQUARES[currAI.pos];
-                const cB = sq.type === 'PROPERTY' && (!gameData.properties || gameData.properties[sq.id] === undefined) && currAI.money >= sq.price && currAI.trust >= sq.reqTrust;
-                if (cB && Math.random() > 0.2) { handleBuyProperty(); } else { handleEndTurn(); }
-            }, 2000); }
-            else if (gameState === 'END_TURN') { tId = setTimeout(() => { handleEndTurn(); }, 2000); }
+            if (gameState === 'IDLE') { 
+                tId = setTimeout(() => { 
+                    if (currAI.jailRoundsLeft === -1) { 
+                        syncGameData({ gameState: 'JAIL_BWA_BWEI', bwaBweiResults: [] }); 
+                    } else { 
+                        handleRollDice(); 
+                    } 
+                }, 1200); 
+            }
+            else if (gameState === 'JAIL_BWA_BWEI') { 
+                tId = setTimeout(() => { 
+                    if ((gameData.bwaBweiResults || []).length < 3) { 
+                        handleThrowBwaBwei(); 
+                    } else { 
+                        handleFinishBwaBwei(); 
+                    } 
+                }, 1200); 
+            }
+            else if (gameState === 'ACTION') { 
+                tId = setTimeout(() => {
+                    const sq = BOARD_SQUARES[currAI.pos];
+                    const cB = sq.type === 'PROPERTY' && (!gameData.properties || gameData.properties[sq.id] === undefined) && currAI.money >= sq.price && currAI.trust >= sq.reqTrust;
+                    if (cB && Math.random() > 0.2) { handleBuyProperty(); } else { handleEndTurn(); }
+                }, 2000); 
+            }
+            else if (gameState === 'END_TURN') { 
+                tId = setTimeout(() => { handleEndTurn(); }, 2000); 
+            }
         }
         return () => clearTimeout(tId);
     }
@@ -1109,178 +1020,75 @@ export default function App() {
   }, [gameData.gameState, gameData.currentPlayerIdx, gameData.bwaBweiResults, gameData.pendingTrade, isOfflineMode, appPhase]);
 
 
-  // -------------------------------------------------------------
-  // 事件處理器，完全移出 JSX 行內定義
-  // -------------------------------------------------------------
-  function handleLocalNameChange(e) {
-      const val = e.target.value;
-      const sub = val.substring(0, 6);
-      const newNames = [];
-      for(let j=0; j<localNames.length; j++) { newNames.push(localNames[j]); }
-      newNames[editingLocalPlayer] = sub;
-      setLocalNames(newNames);
-  }
-
-  function handleLocalTypeToggle() {
-      const newTypes = [];
-      for(let j=0; j<localPlayerTypes.length; j++) { newTypes.push(localPlayerTypes[j]); }
-      newTypes[editingLocalPlayer] = newTypes[editingLocalPlayer] === 'HUMAN' ? 'AI' : 'HUMAN';
-      setLocalPlayerTypes(newTypes);
-  }
-
-  function handleLocalAvatarSelect(avatar, targetIdx) {
-      const newAvatars = [];
-      for(let j=0; j<localAvatars.length; j++) { newAvatars.push(localAvatars[j]); }
-      newAvatars[targetIdx] = avatar;
-      setLocalAvatars(newAvatars);
-  }
-
-  function handleSetupNameChange(e) {
-      const val = e.target.value;
-      setSetupName(val.substring(0, 6));
-  }
-
-  function handleRoomIdChange(e) {
-      const val = e.target.value;
-      setRoomId(val.toUpperCase());
-  }
-
-  function handleSquareClick(idx) {
-      if (!dragStatus.current.moved) {
-          setSelectedSquareInfo(idx);
-      }
-  }
-
-  function handlePlayerClick(e, pId) {
-      if (pId === activePlayerIndex && (!myPlayer || !myPlayer.isAI)) {
-          e.stopPropagation();
-          setShowAssetManager(true);
-      }
-  }
-
-  function closeAssetManager(e) {
-      if (e) e.stopPropagation();
-      setShowAssetManager(false);
-      setSellProcess(null);
-  }
-
-  function handleMenuZoomIn() { setZoom(function(z) { return Math.min(z + 0.1, 1.5); }); setIsMenuOpen(false); }
-  function handleMenuZoomOut() { setZoom(function(z) { return Math.max(z - 0.1, 0.4); }); setIsMenuOpen(false); }
-  function handleMenuFindPlayer() { focusOnCurrentPlayer(); setIsMenuOpen(false); }
-  function handleMenuToggleMap() { setIsFullMapMode(!isFullMapMode); setIsMenuOpen(false); }
-  function handleMenuExit() { setShowExitConfirm(true); setIsMenuOpen(false); }
-  function handleExitConfirmClose() { setShowExitConfirm(false); }
-  function handleExitConfirmConfirm() { window.location.reload(); }
-  function handleSetSetupModeInit() { setSetupMode('INIT'); }
-  function handleSetSetupModeLocal() { setSetupMode('LOCAL'); }
-  function handleSetSetupModeCreate() { setSetupMode('CREATE'); }
-  function handleSetSetupModeJoin() { setSetupMode('JOIN'); }
-  function handleRespondTradeFalse() { handleRespondTrade(false); }
-  function handleRespondTradeTrue() { handleRespondTrade(true); }
-  function handleMenuToggle() { setIsMenuOpen(!isMenuOpen); }
-  function handleMuteToggle() { setIsMuted(!isMuted); }
-  function handleCloseSquareInfo() { setSelectedSquareInfo(null); }
-
-  // -------------------------------------------------------------
-  // 渲染獨立區塊，確保 JSX 結構單純且沒有任何 .map() 呼叫
-  // -------------------------------------------------------------
-  const renderPlayerCountOptions = function() {
+  const renderPlayerCountOptions = () => {
       const opts = [2, 3, 4, 5, 6];
-      const elements = [];
-      for (let i = 0; i < opts.length; i++) {
-          const num = opts[i];
+      return opts.map(num => {
           const isActive = setupPlayerCount === num;
-          elements.push(
-              <button key={num} onClick={function() { setSetupPlayerCount(num); }} className={`w-12 h-12 md:w-14 md:h-14 rounded-full text-xl md:text-2xl transition-all border-4 border-white ${isActive ? 'bg-amber-400 text-amber-900 scale-110 shadow-[0_4px_0_0_#d97706]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>
+          return (
+              <button key={num} onClick={() => setSetupPlayerCount(num)} className={`w-12 h-12 md:w-14 md:h-14 rounded-full text-xl md:text-2xl transition-all border-4 border-white ${isActive ? 'bg-amber-400 text-amber-900 scale-110 shadow-[0_4px_0_0_#d97706]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>
                   {num}
               </button>
           );
-      }
-      return elements;
+      });
   };
 
-  const renderTimeLimitOptions = function() {
-      const opts = [
-          { l: '5 分', v: 300 },
-          { l: '10 分', v: 600 },
-          { l: '20 分', v: 1200 },
-          { l: '不限時', v: -1 }
-      ];
-      const elements = [];
-      for (let i = 0; i < opts.length; i++) {
-          const t = opts[i];
+  const renderTimeLimitOptions = () => {
+      const opts = [ { l: '5 分', v: 300 }, { l: '10 分', v: 600 }, { l: '20 分', v: 1200 }, { l: '不限時', v: -1 } ];
+      return opts.map(t => {
           const isActive = setupTimeLimit === t.v;
-          elements.push(
-              <button key={t.v} onClick={function() { setSetupTimeLimit(t.v); }} className={`px-4 py-2 md:px-5 md:py-3 rounded-[1.5rem] transition-all border-4 border-white text-sm md:text-base ${isActive ? 'bg-pink-400 text-pink-900 shadow-[0_4px_0_0_#db2777]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>
+          return (
+              <button key={t.v} onClick={() => setSetupTimeLimit(t.v)} className={`px-4 py-2 md:px-5 md:py-3 rounded-[1.5rem] transition-all border-4 border-white text-sm md:text-base ${isActive ? 'bg-pink-400 text-pink-900 shadow-[0_4px_0_0_#db2777]' : 'bg-sky-100 text-sky-600 hover:bg-sky-200 shadow-sm'}`}>
                   {t.l}
               </button>
           );
-      }
-      return elements;
+      });
   };
 
-  const renderLocalPlayers = function() {
-      const elements = [];
-      for (let i = 0; i < setupPlayerCount; i++) {
+  const renderLocalPlayers = () => {
+      return Array.from({ length: setupPlayerCount }).map((_, i) => {
           const isActive = editingLocalPlayer === i;
-          elements.push(
+          return (
               <div key={i} className="flex flex-col items-center gap-1 md:gap-2">
-                  <button 
-                      onClick={function() { setEditingLocalPlayer(i); }}
-                      className={`w-10 h-10 md:w-12 md:h-12 rounded-full text-2xl md:text-3xl flex items-center justify-center bg-white transition-all border-4 ${isActive ? 'border-amber-400 scale-125 shadow-lg z-10 relative' : 'border-sky-200 opacity-70 hover:opacity-100 hover:scale-110'}`}
-                  >
+                  <button onClick={() => setEditingLocalPlayer(i)} className={`w-10 h-10 md:w-12 md:h-12 rounded-full text-2xl md:text-3xl flex items-center justify-center bg-white transition-all border-4 ${isActive ? 'border-amber-400 scale-125 shadow-lg z-10 relative' : 'border-sky-200 opacity-70 hover:opacity-100 hover:scale-110'}`}>
                       {localAvatars[i]}
                   </button>
                   <span className="text-[10px] md:text-xs text-sky-600 bg-white px-2 py-0.5 rounded-full border-2 border-sky-100 max-w-[60px] truncate">{localNames[i]}</span>
               </div>
           );
-      }
-      return elements;
+      });
   };
 
-  const renderChildAvatarsLocal = function() {
-      const elements = [];
-      for (let j = 0; j < CHILD_AVATARS.length; j++) {
-          const avatar = CHILD_AVATARS[j];
-          const targetIdx = editingLocalPlayer < setupPlayerCount ? editingLocalPlayer : 0;
+  const renderChildAvatarsLocal = () => {
+      const targetIdx = editingLocalPlayer < setupPlayerCount ? editingLocalPlayer : 0;
+      return CHILD_AVATARS.map(avatar => {
           const isActive = localAvatars[targetIdx] === avatar;
-          elements.push(
-              <button 
-                  key={avatar} 
-                  onClick={function() { handleLocalAvatarSelect(avatar, targetIdx); }} 
-                  className={`w-10 h-10 md:w-12 md:h-12 rounded-full text-2xl md:text-3xl flex items-center justify-center transition-all ${isActive ? 'bg-amber-100 border-4 border-amber-400 scale-110' : 'bg-slate-50 border-2 border-transparent hover:bg-sky-100'}`}
-              >
+          return (
+              <button key={avatar} onClick={() => {
+                  const nextAvatars = localAvatars.slice();
+                  nextAvatars[targetIdx] = avatar;
+                  setLocalAvatars(nextAvatars);
+              }} className={`w-10 h-10 md:w-12 md:h-12 rounded-full text-2xl md:text-3xl flex items-center justify-center transition-all ${isActive ? 'bg-amber-100 border-4 border-amber-400 scale-110' : 'bg-slate-50 border-2 border-transparent hover:bg-sky-100'}`}>
                   {avatar}
               </button>
           );
-      }
-      return elements;
+      });
   };
 
-  const renderChildAvatarsJoin = function() {
-      const elements = [];
-      for (let j = 0; j < CHILD_AVATARS.length; j++) {
-          const avatar = CHILD_AVATARS[j];
+  const renderChildAvatarsJoin = () => {
+      return CHILD_AVATARS.map(avatar => {
           const isActive = setupAvatar === avatar;
-          elements.push(
-              <button 
-                  key={avatar} 
-                  onClick={function() { setSetupAvatar(avatar); }} 
-                  className={`w-12 h-12 md:w-16 md:h-16 rounded-full text-3xl md:text-4xl flex items-center justify-center bg-white transition-all ${isActive ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}
-              >
+          return (
+              <button key={avatar} onClick={() => setSetupAvatar(avatar)} className={`w-12 h-12 md:w-16 md:h-16 rounded-full text-3xl md:text-4xl flex items-center justify-center bg-white transition-all ${isActive ? 'border-4 border-amber-400 scale-110 shadow-md' : 'border-2 border-sky-100 hover:bg-sky-100'}`}>
                   {avatar}
               </button>
           );
-      }
-      return elements;
+      });
   };
 
-  const renderTopBarPlayers = function() {
-      const elements = [];
-      for (let i = 0; i < gameData.players.length; i++) {
-          const p = gameData.players[i];
+  const renderTopBarPlayers = () => {
+      return gameData.players.map(p => {
           const isCurrent = gameData.currentPlayerIdx === p.id;
-          elements.push(
+          return (
               <div key={p.id} className={`flex items-center gap-3 px-5 py-2.5 rounded-[2.5rem] border-4 shadow-sm h-[75px] shrink-0 transition-all duration-300 ${isCurrent ? 'border-amber-400 bg-amber-50 scale-110 z-10 shadow-[0_5px_15px_rgba(217,119,6,0.2)]' : 'border-white bg-white/80 opacity-90'} ${p.isBankrupt ? 'grayscale opacity-50' : ''}`}>
                   <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center text-4xl shadow-sm bg-white border-4 border-slate-100 relative">
                       {p.icon}
@@ -1292,8 +1100,8 @@ export default function App() {
                       </div>
                       {p.uid !== null && !p.isBankrupt ? (
                           <div className="flex gap-2 items-end leading-none">
-                              <span className={`text-[1.1rem] ${p.money < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{"$"}{p.money}</span>
-                              <span className={`text-[13px] flex items-center gap-0.5 ${p.trust <= 0 ? 'text-rose-500' : 'text-amber-500'}`}><Star size={12} fill="currentColor"></Star>{p.trust}</span>
+                              <span className={`text-[1.1rem] ${p.money < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>${p.money}</span>
+                              <span className={`text-[13px] flex items-center gap-0.5 ${p.trust <= 0 ? 'text-rose-500' : 'text-amber-500'}`}><Star size={12} fill="currentColor" />{p.trust}</span>
                           </div>
                       ) : (
                           <span className="text-sm text-slate-400 italic mt-1">{p.isBankrupt ? '出局 🥺' : '等待中...'}</span>
@@ -1301,59 +1109,38 @@ export default function App() {
                   </div>
               </div>
           );
-      }
-      return elements;
-  };
-
-  const renderRankedPlayers = function() {
-      const rankedPlayers = [];
-      for (let i = 0; i < gameData.players.length; i++) { rankedPlayers.push(gameData.players[i]); }
-      rankedPlayers.sort((a, b) => {
-          if (b.trust !== a.trust) return b.trust - a.trust; 
-          return b.money - a.money; 
       });
-
-      const elements = [];
-      for (let i = 0; i < rankedPlayers.length; i++) {
-          const p = rankedPlayers[i];
-          elements.push(
-              <div key={p.id} className={`flex items-center justify-between p-5 mb-4 rounded-[2rem] border-4 ${i === 0 ? 'bg-amber-50 border-amber-400 shadow-md scale-105 relative z-10' : 'bg-slate-50 border-slate-200'}`}>
-                  {i === 0 && <div className="absolute -top-4 -left-4 text-4xl animate-bounce">👑</div>}
-                  <div className="flex items-center gap-5">
-                      <span className={`font-black text-3xl ${i === 0 ? 'text-amber-500' : 'text-slate-400'}`}>#{i+1}</span>
-                      <div className="text-5xl bg-white p-2 rounded-full shadow-sm border-2 border-slate-100">{p.icon}</div>
-                      <span className="font-black text-2xl text-slate-700">{p.name} {p.isBankrupt && <span className="text-sm text-red-400 ml-1">(出局)</span>}</span>
-                  </div>
-                  <div className="text-right">
-                      <div className="text-amber-500 font-black text-2xl flex items-center justify-end gap-1"><Star size={24} fill="currentColor"></Star> {p.trust} 點</div>
-                      <div className="text-emerald-500 font-black text-lg">💰 {"$"}{p.money}</div>
-                  </div>
-              </div>
-          );
-      }
-      return elements;
   };
 
-  const renderSelectedSquareModal = function() {
+  const renderRankedPlayers = () => {
+      const rankedPlayers = gameData.players.slice().sort((a, b) => b.trust !== a.trust ? b.trust - a.trust : b.money - a.money);
+      return rankedPlayers.map((p, i) => (
+          <div key={p.id} className={`flex items-center justify-between p-5 mb-4 rounded-[2rem] border-4 ${i === 0 ? 'bg-amber-50 border-amber-400 shadow-md scale-105 relative z-10' : 'bg-slate-50 border-slate-200'}`}>
+              {i === 0 && <div className="absolute -top-4 -left-4 text-4xl animate-bounce">👑</div>}
+              <div className="flex items-center gap-5">
+                  <span className={`font-black text-3xl ${i === 0 ? 'text-amber-500' : 'text-slate-400'}`}>#{i+1}</span>
+                  <div className="text-5xl bg-white p-2 rounded-full shadow-sm border-2 border-slate-100">{p.icon}</div>
+                  <span className="font-black text-2xl text-slate-700">{p.name} {p.isBankrupt && <span className="text-sm text-red-400 ml-1">(出局)</span>}</span>
+              </div>
+              <div className="text-right">
+                  <div className="text-amber-500 font-black text-2xl flex items-center justify-end gap-1"><Star size={24} fill="currentColor" /> {p.trust} 點</div>
+                  <div className="text-emerald-500 font-black text-lg">💰 ${p.money}</div>
+              </div>
+          </div>
+      ));
+  };
+
+  const renderSelectedSquareModal = () => {
     if (selectedSquareInfo === null) return null;
     const sq = BOARD_SQUARES[selectedSquareInfo];
-    const ownerId = gameData.properties ? gameData.properties[sq.id] : undefined;
-    let owner = null;
-    if (ownerId !== undefined) {
-        for (let i = 0; i < gameData.players.length; i++) {
-            if (gameData.players[i].id === ownerId) {
-                owner = gameData.players[i];
-                break;
-            }
-        }
-    }
-    
+    const ownerId = gameData.properties?.[sq.id];
+    const owner = ownerId !== undefined ? gameData.players.find(p => p.id === ownerId) : null;
     const rentPrice = Math.floor(sq.price * 0.4);
 
     return (
-      <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={handleCloseSquareInfo}>
+      <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setSelectedSquareInfo(null)}>
         <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 w-full max-w-sm animate-in zoom-in-95 spin-in-1 mx-4 flex flex-col relative" onClick={e => e.stopPropagation()}>
-          <button onClick={handleCloseSquareInfo} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3}></X></button>
+          <button onClick={() => setSelectedSquareInfo(null)} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3} /></button>
           
           <div className={`w-full h-20 rounded-[1.5rem] mb-5 ${sq.color || 'bg-slate-200'} border-4 border-white shadow-sm flex items-center justify-center text-4xl`}>
             {sq.type === 'START' && '✨'}
@@ -1370,15 +1157,15 @@ export default function App() {
             <div className="flex flex-col gap-3 w-full">
               <div className="flex justify-between items-center bg-sky-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm">
                 <span className="text-sky-800 text-lg">購買需要</span>
-                <span className="font-black text-sky-600 text-2xl">{"$"}{sq.price}</span>
+                <span className="font-black text-sky-600 text-2xl">${sq.price}</span>
               </div>
               <div className="flex justify-between items-center bg-rose-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm">
                 <span className="text-rose-800 text-lg">過路費</span>
-                <span className="font-black text-rose-500 text-2xl">{"$"}{rentPrice}</span>
+                <span className="font-black text-rose-500 text-2xl">${rentPrice}</span>
               </div>
               <div className="flex justify-between items-center bg-amber-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm">
                 <span className="text-amber-800 text-lg">信用門檻</span>
-                <span className="font-black text-amber-500 text-2xl flex items-center gap-1"><Star size={24} fill="currentColor"></Star> {sq.reqTrust}</span>
+                <span className="font-black text-amber-500 text-2xl flex items-center gap-1"><Star size={24} fill="currentColor" /> {sq.reqTrust}</span>
               </div>
               
               <div className="mt-4 p-5 rounded-[2rem] border-[4px] border-dashed border-slate-200 text-center bg-slate-50 relative overflow-hidden">
@@ -1397,7 +1184,7 @@ export default function App() {
           {(sq.type === 'TAX' || sq.type === 'START') && (
             <div className={`flex justify-between items-center p-6 rounded-[2rem] border-4 w-full mt-2 shadow-sm ${sq.type === 'TAX' ? 'bg-rose-100 border-white' : 'bg-emerald-100 border-white'}`}>
               <span className={`text-2xl ${sq.type === 'TAX' ? 'text-rose-800' : 'text-emerald-800'}`}>{sq.type === 'TAX' ? '要繳交 💸' : '可領取 💰'}</span>
-              <span className={`font-black text-4xl ${sq.type === 'TAX' ? 'text-rose-500' : 'text-emerald-500'}`}>{"$"}{sq.amount || 500}</span>
+              <span className={`font-black text-4xl ${sq.type === 'TAX' ? 'text-rose-500' : 'text-emerald-500'}`}>${sq.amount || 500}</span>
             </div>
           )}
         </div>
@@ -1405,68 +1192,60 @@ export default function App() {
     );
   };
 
-  const renderBwaBweiList = function() {
-      const elements = [];
-      for(let i=0; i<3; i++) {
+  const renderBwaBweiList = () => {
+      return [0, 1, 2].map(i => {
          const res = (gameData.bwaBweiResults || [])[i];
-         elements.push(
+         return (
              <div key={i} className={`w-24 h-28 rounded-2xl flex flex-col items-center justify-center border-4 shadow-sm ${res === 'HOLY' ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
                <div className="flex scale-75 mb-2">
-                  {res === 'HOLY' && <><BweiBlock isFlat={true} className="rotate-12"></BweiBlock><BweiBlock isFlat={false} className="-rotate-12 scale-x-[-1] ml-[-8px]"></BweiBlock></>}
-                  {res === 'LAUGH' && <><BweiBlock isFlat={true} className="rotate-12"></BweiBlock><BweiBlock isFlat={true} className="-rotate-12 scale-x-[-1] ml-[-8px]"></BweiBlock></>}
-                  {res === 'YIN' && <><BweiBlock isFlat={false} className="rotate-12"></BweiBlock><BweiBlock isFlat={false} className="-rotate-12 scale-x-[-1] ml-[-8px]"></BweiBlock></>}
+                  {res === 'HOLY' && <><BweiBlock isFlat={true} className="rotate-12" /><BweiBlock isFlat={false} className="-rotate-12 scale-x-[-1] ml-[-8px]" /></>}
+                  {res === 'LAUGH' && <><BweiBlock isFlat={true} className="rotate-12" /><BweiBlock isFlat={true} className="-rotate-12 scale-x-[-1] ml-[-8px]" /></>}
+                  {res === 'YIN' && <><BweiBlock isFlat={false} className="rotate-12" /><BweiBlock isFlat={false} className="-rotate-12 scale-x-[-1] ml-[-8px]" /></>}
                </div>
                <span className="font-black text-sm">{res === 'HOLY' ? '聖杯' : res ? '無杯' : ''}</span>
              </div>
          );
-      }
-      return elements;
+      });
   };
 
-  const renderMyProperties = function() {
+  const renderMyProperties = () => {
       if (myProperties.length === 0) {
           return <div className="text-center text-slate-300 text-lg py-8 bg-slate-50 rounded-[2rem] border-4 border-dashed border-slate-200">包包裡空空的 🥺</div>;
       }
-      const elements = [];
-      for (let i=0; i<myProperties.length; i++) {
-          const sqId = myProperties[i];
-          const sq = BOARD_SQUARES[sqId];
-          if (!sq) continue;
-          let sellPrice = Math.floor(sq.price * 0.5);
-          if (myPlayer && myPlayer.trust >= 10) { sellPrice = sq.price; }
-          elements.push(
-              <div key={sqId} className="flex justify-between items-center p-4 bg-sky-50 rounded-[1.5rem] border-4 border-white shadow-sm font-black">
-                  <span className="font-black text-sky-800 text-xl">{sq.name}</span>
-                  <button onClick={function() { setSellProcess({ sqId: sqId, price: sellPrice }); }} className="bg-rose-400 hover:bg-rose-300 text-white shadow-[0_4px_0_0_#e11d48] active:translate-y-[4px] active:shadow-none text-xl px-5 py-2 rounded-xl transition-all border-2 border-white font-black font-black font-black">
-                      變賣
-                  </button>
-              </div>
-          );
-      }
-      return <div className="flex flex-col gap-3 max-h-56 overflow-y-auto pr-2 custom-scrollbar">{elements}</div>;
+      return (
+          <div className="flex flex-col gap-3 max-h-56 overflow-y-auto pr-2 custom-scrollbar">
+              {myProperties.map(sqId => {
+                  const sq = BOARD_SQUARES[sqId];
+                  if (!sq) return null;
+                  const sellPrice = myPlayer?.trust >= 10 ? sq.price : Math.floor(sq.price * 0.5);
+                  return (
+                      <div key={sqId} className="flex justify-between items-center p-4 bg-sky-50 rounded-[1.5rem] border-4 border-white shadow-sm font-black">
+                          <span className="font-black text-sky-800 text-xl">{sq.name}</span>
+                          <button onClick={() => setSellProcess({ sqId, price: sellPrice })} className="bg-rose-400 hover:bg-rose-300 text-white shadow-[0_4px_0_0_#e11d48] active:translate-y-[4px] active:shadow-none text-xl px-5 py-2 rounded-xl transition-all border-2 border-white font-black">變賣</button>
+                      </div>
+                  );
+              })}
+          </div>
+      );
   };
 
-  const renderSellTargets = function() {
-      const elements = [];
-      for (let i = 0; i < gameData.players.length; i++) {
-          const p = gameData.players[i];
-          if (p.id === activePlayerIndex || p.isBankrupt || (!isOfflineMode && p.uid === null)) continue;
-          elements.push(
-              <button key={p.id} onClick={function() { initiatePlayerTrade(sellProcess.sqId, sellProcess.price, p.id); }} className="w-full py-4 bg-white border-4 border-emerald-100 text-emerald-600 rounded-2xl shadow-sm flex items-center justify-between px-6 active:scale-95 transition-all font-black font-black">
+  const renderSellTargets = () => {
+      return gameData.players
+          .filter(p => p.id !== activePlayerIndex && !p.isBankrupt && (isOfflineMode || p.uid !== null))
+          .map(p => (
+              <button key={p.id} onClick={() => initiatePlayerTrade(sellProcess.sqId, sellProcess.price, p.id)} className="w-full py-4 bg-white border-4 border-emerald-100 text-emerald-600 rounded-2xl shadow-sm flex items-center justify-between px-6 active:scale-95 transition-all font-black">
                   <span>🤝 賣給 {p.name}</span><span className="text-4xl">{p.icon}</span>
               </button>
-          );
-      }
-      return elements;
+          ));
   };
 
-  const renderTradeOrActionModal = function() {
+  const renderTradeOrActionModal = () => {
       const showBasicAction = gameData.currentPlayerIdx === activePlayerIndex && myPlayer && !myPlayer.isBankrupt && ['JAIL_BWA_BWEI', 'ACTION', 'END_TURN'].includes(gameData.gameState) && !gameData.pendingTrade;
       if (!isTradeActive && !showBasicAction) return null;
 
       let content = null;
       if (isTradeActive) {
-          if (tradeBuyer && tradeBuyer.isAI) {
+          if (tradeBuyer?.isAI) {
               content = (
                  <div className="flex flex-col items-center gap-4 py-8">
                      <div className="text-6xl animate-bounce mb-4">🤖</div>
@@ -1477,12 +1256,12 @@ export default function App() {
           } else {
               content = (
                  <>
-                    <div className="bg-emerald-50 p-6 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-2 border-4 border-white shadow-inner text-emerald-500"><Handshake size={48}></Handshake></div>
+                    <div className="bg-emerald-50 p-6 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-2 border-4 border-white shadow-inner text-emerald-500"><Handshake size={48} /></div>
                     <h2 className="text-3xl font-black text-slate-700">🤝 產權購買邀請</h2>
-                    <p className="text-xl text-slate-500 leading-relaxed font-black font-black">玩家 <span className="text-amber-600">{gameData.players[gameData.pendingTrade.sellerIdx].name}</span> <br/>想以 <span className="text-emerald-500 font-black">{"$"}{gameData.pendingTrade.price}</span> 出售 <br/><span className="text-sky-600 font-black">{BOARD_SQUARES[gameData.pendingTrade.sqId].name}</span> 給 <span className="text-emerald-600">{tradeBuyer ? tradeBuyer.name : ''}</span>！</p>
+                    <p className="text-xl text-slate-500 leading-relaxed font-black">玩家 <span className="text-amber-600">{gameData.players[gameData.pendingTrade.sellerIdx].name}</span> <br/>想以 <span className="text-emerald-500 font-black">${gameData.pendingTrade.price}</span> 出售 <br/><span className="text-sky-600 font-black">{BOARD_SQUARES[gameData.pendingTrade.sqId].name}</span> 給 <span className="text-emerald-600">{tradeBuyer?.name || ''}</span>！</p>
                     <div className="flex gap-4 w-full">
-                       <button onClick={handleRespondTradeFalse} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl border-4 border-white shadow-md font-black text-xl active:scale-95 transition-all">婉拒</button>
-                       <button disabled={tradeBuyerMoney < gameData.pendingTrade.price} onClick={handleRespondTradeTrue} className={`flex-1 py-4 rounded-2xl border-4 border-white shadow-lg font-black text-xl active:translate-y-1 transition-all font-black ${tradeBuyerMoney >= gameData.pendingTrade.price ? 'bg-emerald-400 text-white shadow-[0_6px_0_0_#10b981]' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                       <button onClick={() => handleRespondTrade(false)} className="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl border-4 border-white shadow-md font-black text-xl active:scale-95 transition-all">婉拒</button>
+                       <button disabled={tradeBuyerMoney < gameData.pendingTrade.price} onClick={() => handleRespondTrade(true)} className={`flex-1 py-4 rounded-2xl border-4 border-white shadow-lg font-black text-xl active:translate-y-1 transition-all ${tradeBuyerMoney >= gameData.pendingTrade.price ? 'bg-emerald-400 text-white shadow-[0_6px_0_0_#10b981]' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                          {tradeBuyerMoney < gameData.pendingTrade.price ? '資金不足' : '收購！'}
                        </button>
                     </div>
@@ -1490,7 +1269,7 @@ export default function App() {
               );
           }
       } else {
-          if (myPlayer && myPlayer.isAI) {
+          if (myPlayer?.isAI) {
               content = (
                  <div className="flex flex-col items-center gap-4 py-8">
                      <div className="text-6xl animate-bounce mb-4">🤖</div>
@@ -1499,23 +1278,21 @@ export default function App() {
                  </div>
               );
           } else {
-              const bwaLen = gameData.bwaBweiResults ? gameData.bwaBweiResults.length : 0;
+              const bwaLen = (gameData.bwaBweiResults || []).length;
               const hasNoOwner = !gameData.properties || gameData.properties[myPlayer.pos] === undefined;
               content = (
                  <>
                    {gameData.gameState === 'JAIL_BWA_BWEI' && (
                      <div className="flex flex-col items-center w-full px-1 md:px-2">
-                       <div className="text-2xl font-black text-rose-500 mb-6 bg-rose-50 px-8 py-3 rounded-full border-4 border-white shadow-sm font-black font-black">🚨 靜心房擲杯判定</div>
-                       <div className="flex gap-4 mb-8">
-                         {renderBwaBweiList()}
-                       </div>
-                       {bwaLen < 3 ? <button onClick={handleThrowBwaBwei} className="w-full py-5 bg-rose-400 text-white rounded-[2rem] border-4 border-white shadow-lg text-2xl font-black font-black">🙏 擲杯</button> : <button onClick={handleFinishBwaBwei} className="w-full py-5 bg-emerald-400 text-white rounded-[2rem] border-4 border-white shadow-lg text-2xl animate-bounce font-black font-black">✨ 查看結果</button>}
+                       <div className="text-2xl font-black text-rose-500 mb-6 bg-rose-50 px-8 py-3 rounded-full border-4 border-white shadow-sm font-black">🚨 靜心房擲杯判定</div>
+                       <div className="flex gap-4 mb-8">{renderBwaBweiList()}</div>
+                       {bwaLen < 3 ? <button onClick={handleThrowBwaBwei} className="w-full py-5 bg-rose-400 text-white rounded-[2rem] border-4 border-white shadow-lg text-2xl font-black">🙏 擲杯</button> : <button onClick={handleFinishBwaBwei} className="w-full py-5 bg-emerald-400 text-white rounded-[2rem] border-4 border-white shadow-lg text-2xl animate-bounce font-black">✨ 查看結果</button>}
                      </div>
                    )}
                    {gameData.gameState !== 'JAIL_BWA_BWEI' && <div className="text-3xl leading-relaxed whitespace-pre-line px-4 text-slate-700 font-black">{gameData.actionMessage}</div>}
                    <div className="flex flex-col gap-4 w-full mt-4 font-black">
-                     {gameData.gameState==='ACTION' && currentSquare && currentSquare.type==='PROPERTY' && myPlayer && hasNoOwner && (
-                       <button onClick={canBuy ? handleBuyProperty : null} disabled={!canBuy} className={`py-5 rounded-[2rem] border-4 border-white shadow-lg font-black text-2xl transition-all active:scale-95 ${canBuy ? 'bg-sky-400 text-white shadow-md' : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'}`}>🎁 買下這裡！({"$"}{currentSquare ? currentSquare.price : 0})</button>
+                     {gameData.gameState==='ACTION' && currentSquare?.type==='PROPERTY' && myPlayer && hasNoOwner && (
+                       <button onClick={canBuy ? handleBuyProperty : null} disabled={!canBuy} className={`py-5 rounded-[2rem] border-4 border-white shadow-lg font-black text-2xl transition-all active:scale-95 ${canBuy ? 'bg-sky-400 text-white shadow-md' : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'}`}>🎁 買下這裡！(${currentSquare?.price || 0})</button>
                      )}
                      {(gameData.gameState==='ACTION'||gameData.gameState==='END_TURN') && <button onClick={handleEndTurn} className="py-5 bg-amber-400 text-amber-900 rounded-[2rem] border-4 border-white shadow-lg text-2xl font-black active:translate-y-1 transition-all">✅ 結束回合</button>}
                    </div>
@@ -1531,31 +1308,31 @@ export default function App() {
       );
   };
 
-  const renderAssetManagerModal = function() {
+  const renderAssetManagerModal = () => {
       if (!showAssetManager || !myPlayer) return null;
       return (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={closeAssetManager}>
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => { setShowAssetManager(false); setSellProcess(null); }}>
           <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-amber-100 w-[92vw] max-w-md relative pt-14 shadow-2xl animate-in zoom-in-95 font-black" onClick={e=>e.stopPropagation()}>
-              <button onClick={closeAssetManager} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform font-black"><X size={28} strokeWidth={3}></X></button>
+              <button onClick={() => { setShowAssetManager(false); setSellProcess(null); }} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3} /></button>
 
               {!sellProcess ? (
                  <>
                   <div className="flex flex-col items-center border-b-4 border-dashed border-amber-100 pb-4 mb-4">
                       <div className="w-16 h-16 bg-amber-50 rounded-full border-4 border-amber-200 flex items-center justify-center text-4xl mb-2 shadow-inner">💼</div>
                       <h3 className="font-black text-2xl text-amber-700">小金庫與資產</h3>
-                      {isOfflineMode && <div className="text-amber-500 text-base mt-1">({myPlayer ? myPlayer.name : ''} 的包包)</div>}
+                      {isOfflineMode && <div className="text-amber-500 text-base mt-1">({myPlayer.name} 的包包)</div>}
                   </div>
                   
                   <div className="flex gap-3 mb-5">
                      <div className="flex-1 bg-emerald-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm flex flex-col items-center relative overflow-hidden">
                         <div className="absolute -right-2 -bottom-4 text-[4rem] opacity-10">💰</div>
                         <div className="text-emerald-800 font-bold text-sm mb-1 z-10">目前資金</div>
-                        <div className="font-black text-2xl text-emerald-500 z-10">{"$"}{myPlayer ? myPlayer.money : 0}</div>
+                        <div className="font-black text-2xl text-emerald-500 z-10">${myPlayer.money}</div>
                      </div>
                      <div className="flex-1 bg-amber-50 p-4 rounded-[1.5rem] border-4 border-white shadow-sm flex flex-col items-center relative overflow-hidden">
                         <div className="absolute -right-2 -bottom-4 text-[4rem] opacity-10">⭐</div>
                         <div className="text-amber-800 font-bold text-sm mb-1 z-10">目前信用</div>
-                        <div className="font-black text-2xl text-amber-500 z-10 flex items-center gap-1"><Star size={20} fill="currentColor"></Star>{myPlayer ? myPlayer.trust : 0}</div>
+                        <div className="font-black text-2xl text-amber-500 z-10 flex items-center gap-1"><Star size={20} fill="currentColor" />{myPlayer.trust}</div>
                      </div>
                   </div>
 
@@ -1563,11 +1340,11 @@ export default function App() {
                       <div className="text-slate-400 mb-2 text-center text-sm font-bold">🌟 拿 1 點信用換零用錢</div>
                       <button 
                          onClick={handleMortgageTrust}
-                         disabled={(myPlayer && myPlayer.trust <= 1) ? true : false}
-                         className={`w-full py-4 rounded-[1.5rem] text-xl shadow-[0_5px_0_0_rgba(0,0,0,0.1)] active:translate-y-[5px] active:shadow-none active:border-b-0 transition-all flex items-center justify-center gap-2 border-[4px] border-white ${(myPlayer && myPlayer.trust > 1) ? 'bg-amber-400 text-amber-900 hover:bg-amber-300 cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                         disabled={myPlayer.trust <= 1}
+                         className={`w-full py-4 rounded-[1.5rem] text-xl shadow-[0_5px_0_0_rgba(0,0,0,0.1)] active:translate-y-[5px] active:shadow-none active:border-b-0 transition-all flex items-center justify-center gap-2 border-[4px] border-white ${myPlayer.trust > 1 ? 'bg-amber-400 text-amber-900 hover:bg-amber-300 cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                       >
-                         <Star size={24} fill="currentColor"></Star> 
-                         {(myPlayer && myPlayer.trust >= 10) ? '換取 $1000' : '換取 $500'}
+                         <Star size={24} fill="currentColor" /> 
+                         {myPlayer.trust >= 10 ? '換取 $1000' : '換取 $500'}
                       </button>
                   </div>
 
@@ -1578,16 +1355,16 @@ export default function App() {
                  </>
               ) : (
                  <div className="animate-in slide-in-from-right-4 pt-4 font-black">
-                    <button onClick={function() { setSellProcess(null); }} className="text-sky-500 mb-4 underline font-black font-black">← 返回</button>
-                    <h3 className="text-xl font-black text-slate-700 mb-4 text-center font-black font-black font-black">變賣：{BOARD_SQUARES[sellProcess.sqId].name}</h3>
-                    <div className="bg-amber-50 p-4 rounded-xl mb-6 text-center border-2 border-amber-200 font-black font-black">
+                    <button onClick={() => setSellProcess(null)} className="text-sky-500 mb-4 underline font-black">← 返回</button>
+                    <h3 className="text-xl font-black text-slate-700 mb-4 text-center">變賣：{BOARD_SQUARES[sellProcess.sqId].name}</h3>
+                    <div className="bg-amber-50 p-4 rounded-xl mb-6 text-center border-2 border-amber-200">
                         <div className="text-sm text-slate-500 mb-1">成交價</div>
-                        <div className="text-3xl text-amber-600 font-black font-black font-black font-black">{"$"}{sellProcess.price}</div>
+                        <div className="text-3xl text-amber-600 font-black">${sellProcess.price}</div>
                     </div>
-                    <div className="text-xs text-slate-400 mb-3 font-black uppercase tracking-widest font-black">請選擇出售對象：</div>
-                    <div className="flex flex-col gap-3 font-black font-black font-black font-black">
-                       <button onClick={function() { handleSellToBank(sellProcess.sqId, sellProcess.price); }} className="w-full py-4 bg-indigo-500 text-white rounded-2xl border-4 border-white shadow-md active:scale-95 transition-all font-black">🏦 賣給銀行 (立即領錢)</button>
-                       <div className="w-full h-0.5 bg-slate-100 my-1 font-black font-black"></div>
+                    <div className="text-xs text-slate-400 mb-3 font-black uppercase tracking-widest">請選擇出售對象：</div>
+                    <div className="flex flex-col gap-3">
+                       <button onClick={() => handleSellToBank(sellProcess.sqId, sellProcess.price)} className="w-full py-4 bg-indigo-500 text-white rounded-2xl border-4 border-white shadow-md active:scale-95 transition-all font-black">🏦 賣給銀行 (立即領錢)</button>
+                       <div className="w-full h-0.5 bg-slate-100 my-1"></div>
                        {renderSellTargets()}
                     </div>
                  </div>
@@ -1597,74 +1374,18 @@ export default function App() {
       );
   };
 
-  const renderDiceRollingAnimation = function() {
-      if (gameData.gameState !== 'ROLLING') return null;
-      return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
-          <div className="flex gap-10 bg-white/80 p-12 rounded-[4rem] backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 animate-in zoom-in spin-in-3">
-            <DiceIcon value={safeDice[0]} className="w-36 h-36 text-sky-400 animate-bounce drop-shadow-md" style={{ animationDelay: '0s' }} strokeWidth={1.5}></DiceIcon>
-            <DiceIcon value={safeDice[1]} className="w-36 h-36 text-pink-400 animate-bounce drop-shadow-md" style={{ animationDelay: '0.1s' }} strokeWidth={1.5}></DiceIcon>
-          </div>
-        </div>
-      );
-  };
-
-  const renderBwaBweiRollingAnimation = function() {
-      if (gameData.gameState !== 'BWA_BWEI_ROLLING') return null;
-      return (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center pointer-events-none">
-          <div className="flex flex-col items-center gap-8 bg-white/90 p-12 rounded-[4rem] backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-rose-100 animate-in zoom-in spin-in-3">
-            <div className="text-rose-500 font-black text-4xl animate-pulse drop-shadow-sm">🙏 神明請指示...</div>
-            <div className="flex gap-12 h-32 items-center justify-center">
-              <div className="animate-[bounce_0.4s_infinite_alternate]">
-                <div className="animate-[spin_0.3s_linear_infinite]">
-                   <BweiBlock isFlat={false} className="scale-[1.5]"></BweiBlock>
-                </div>
-              </div>
-              <div className="animate-[bounce_0.5s_infinite_alternate-reverse]">
-                <div className="animate-[spin_0.4s_linear_infinite_reverse]">
-                   <BweiBlock isFlat={true} className="scale-[1.5] scale-x-[-1]"></BweiBlock>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-  };
-
-  const renderBoardSquares = function() {
-      const elements = [];
-      for (let idx = 0; idx < BOARD_SQUARES.length; idx++) {
-          const sq = BOARD_SQUARES[idx];
-          const gridObj = GRID_ORDER[idx];
-          const row = gridObj.row;
-          const col = gridObj.col;
-          
-          let owner = null;
-          if (gameData.properties && gameData.properties[idx] !== undefined) {
-              for (let i = 0; i < gameData.players.length; i++) {
-                  if (gameData.players[i].id === gameData.properties[idx]) {
-                      owner = gameData.players[i];
-                      break;
-                  }
-              }
-          }
-          
-          const activePlayersHere = [];
-          for (let i = 0; i < gameData.players.length; i++) {
-              if (gameData.players[i].pos === idx && gameData.players[i].uid !== null && !gameData.players[i].isBankrupt) {
-                  activePlayersHere.push(gameData.players[i]);
-              }
-          }
+  const renderBoardSquares = () => {
+      return BOARD_SQUARES.map((sq, idx) => {
+          const { row, col } = GRID_ORDER[idx];
+          const ownerId = gameData.properties?.[idx];
+          const owner = ownerId !== undefined ? gameData.players.find(p => p.id === ownerId) : null;
+          const activePlayersHere = gameData.players.filter(p => p.pos === idx && p.uid !== null && !p.isBankrupt);
           
           const bodyBg = owner ? getOwnerBodyClass(owner.color) : 'bg-white';
           const borderClass = owner ? getOwnerBorderClass(owner.color) : 'border-white';
           const contentClass = `flex-1 flex flex-col items-center justify-center p-2 relative w-full h-full ${bodyBg} z-10`;
 
-          let isActiveCell = false;
-          for (let i = 0; i < activePlayersHere.length; i++) {
-              if (activePlayersHere[i].id === gameData.currentPlayerIdx) isActiveCell = true;
-          }
+          const isActiveCell = activePlayersHere.some(p => p.id === gameData.currentPlayerIdx);
           const isMyTurnOnThisCell = isActiveCell && gameData.currentPlayerIdx === activePlayerIndex;
 
           let inactiveCount = 0;
@@ -1673,129 +1394,86 @@ export default function App() {
             { x: 35, y: -35 }, { x: 0, y: -45 }, { x: 0, y: 45 }     
           ];
 
-          const playerElements = [];
-          for (let pIdx = 0; pIdx < activePlayersHere.length; pIdx++) {
-              const p = activePlayersHere[pIdx];
-              const isActive = gameData.currentPlayerIdx === p.id;
-              let tX = 0;
-              let tY = 0;
-              if (!isActive) {
-                  const pos = INACTIVE_OFFSETS[inactiveCount % INACTIVE_OFFSETS.length];
-                  tX = pos.x;
-                  tY = pos.y;
-                  inactiveCount++;
-              }
-
-              let movingBubble = null;
-              if (gameData.gameState === 'MOVING' && gameData.currentPlayerIdx === p.id && gameData.remainingSteps > 0) {
-                  movingBubble = (
-                    <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-[150] w-24 flex justify-center">
-                      <div className="bg-sky-400 border-[6px] border-white text-white font-black rounded-full w-24 h-24 flex items-center justify-center text-[3rem] shadow-[0_10px_20px_rgba(0,0,0,0.15)] animate-bounce">
-                        {gameData.remainingSteps}
-                      </div>
-                    </div>
-                  );
-              }
-
-              let actionBubble = null;
-              if (isMyTurnOnThisCell && p.id === activePlayerIndex && !(myPlayer && myPlayer.isBankrupt) && gameData.gameState === 'IDLE' && !(myPlayer && myPlayer.inJail) && !isTradeActive) {
-                  if (myPlayer && myPlayer.isAI) {
-                      actionBubble = (
-                        <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 z-[200]">
-                          <div className="flex flex-col items-center gap-3 animate-in slide-in-from-bottom-4 duration-300" style={{ transform: 'scale(' + inverseZoom + ')', transformOrigin: 'bottom center' }}>
-                            <div className="whitespace-nowrap px-6 py-3 bg-slate-700 text-white rounded-[2rem] font-black text-xl shadow-lg flex items-center gap-2 animate-pulse border-[3px] border-slate-500">
-                              🤖 思考中...
-                            </div>
-                          </div>
-                        </div>
-                      );
-                  } else {
-                      actionBubble = (
-                        <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 z-[200]">
-                          <div className="flex flex-col items-center gap-3 animate-in slide-in-from-bottom-4 duration-300" style={{ transform: 'scale(' + inverseZoom + ')', transformOrigin: 'bottom center' }}>
-                            <button onClick={handleRollDice} className="whitespace-nowrap px-8 py-4 bg-sky-400 hover:bg-sky-300 text-white rounded-[2rem] font-black text-3xl shadow-[0_8px_0_0_#0284c7,0_10px_20px_rgba(0,0,0,0.15)] active:shadow-none active:translate-y-[8px] active:border-b-0 transition-all flex items-center gap-3 border-[4px] border-white animate-bounce">
-                              <Dice5 size={32} strokeWidth={3}></Dice5> 擲骰子
-                            </button>
-                          </div>
-                        </div>
-                      );
-                  }
-              }
-
-              const isCursorPointer = p.id === activePlayerIndex && (!myPlayer || !myPlayer.isAI);
-              const cursorClass = isCursorPointer ? 'cursor-pointer hover:ring-[6px] hover:ring-sky-300 hover:scale-[1.4] hover:grayscale-0 hover:opacity-100' : '';
-              const borderClasses = isActive ? 'border-amber-400 scale-125 z-40 relative' : 'border-slate-200 scale-[0.65] grayscale opacity-70 z-10';
-
-              playerElements.push(
-                  <div key={p.id} className={`absolute transition-all duration-500 ease-out pointer-events-auto flex flex-col items-center ${isActive ? 'z-50' : 'z-10'}`} style={{ transform: 'translate(' + tX + 'px, ' + tY + 'px)' }}>
-                      {movingBubble}
-                      {p.inJail && <div className="absolute -top-6 -right-6 text-4xl animate-pulse drop-shadow-md z-40 bg-white p-1 rounded-full border-2 border-slate-100">🙏</div>}
-                      <div onClick={function(e) { handlePlayerClick(e, p.id); }} className={`w-20 h-20 bg-white rounded-full border-[6px] flex items-center justify-center text-[3rem] shadow-[0_8px_15px_rgba(0,0,0,0.1)] transition-all duration-500 ${borderClasses} ${cursorClass}`}>
-                          {p.icon}
-                          {p.id === activePlayerIndex && !p.isBankrupt && (!myPlayer || !myPlayer.isAI) && (
-                            <div className="absolute -bottom-2 -right-2 bg-amber-400 text-amber-900 p-1.5 rounded-full shadow-md border-4 border-white z-50 animate-bounce">
-                               <Briefcase size={18} strokeWidth={3}></Briefcase>
-                            </div>
-                          )}
-                      </div>
-                      {actionBubble}
-                  </div>
-              );
-          }
-
-          elements.push(
+          return (
               <div key={idx} style={{ display: 'contents' }}>
-                  <div onClick={function() { handleSquareClick(idx); }} className={`rounded-[1.5rem] relative flex flex-col overflow-hidden shadow-sm z-10 border-4 border-b-[8px] cursor-pointer hover:scale-[1.03] transition-transform pointer-events-auto ${borderClass}`} style={{ gridRow: row, gridColumn: col }}>
-                      {sq.type === 'PROPERTY' && <div className={`h-[20%] min-h-[20%] w-full ${owner ? owner.color : sq.color} border-b-4 border-white/50 z-0 shrink-0`}></div>}
+                  <div onClick={() => { if (!dragStatus.current.moved) setSelectedSquareInfo(idx); }} className={`rounded-[1.5rem] relative flex flex-col overflow-hidden shadow-sm z-10 border-4 border-b-[8px] cursor-pointer hover:scale-[1.03] transition-transform pointer-events-auto ${borderClass}`} style={{ gridRow: row, gridColumn: col }}>
+                      {sq.type === 'PROPERTY' && <div className={`h-[20%] min-h-[20%] w-full ${owner ? owner.color : sq.color} border-b-4 border-white/50 z-0 shrink-0`} />}
                       <div className={contentClass}>
                           <span className="font-black text-slate-700 text-2xl leading-tight text-center mt-1 drop-shadow-sm">{sq.name}</span>
                           {sq.type === 'START' && <span className="text-emerald-700 font-black text-lg leading-tight mt-1 bg-emerald-100 px-3 py-0.5 rounded-full border-2 border-emerald-300">領 $500</span>}
                           {sq.type === 'TAX' && <span className="text-rose-700 font-black text-lg leading-tight mt-1 bg-rose-100 px-3 py-0.5 rounded-full border-2 border-rose-300">繳 ${sq.amount}</span>}
-                          {sq.price && <span className="text-sky-600 font-black text-xl leading-tight mt-1">{"$"}{sq.price}</span>}
+                          {sq.price && <span className="text-sky-600 font-black text-xl leading-tight mt-1">${sq.price}</span>}
                           {sq.reqTrust > 0 && (
                             <div className="mt-1 bg-amber-50 text-amber-600 text-xs font-black px-2 py-0.5 rounded-full border-2 border-amber-300 flex items-center justify-center gap-1 shadow-sm">
-                              <Star size={14} fill="currentColor"></Star> {sq.reqTrust} 點
+                              <Star size={14} fill="currentColor" /> {sq.reqTrust} 點
                             </div>
                           )}
                       </div>
                   </div>
+                  
                   <div className={`flex items-center justify-center relative ${isActiveCell ? 'z-[100]' : 'z-20 pointer-events-none'}`} style={{ gridRow: row, gridColumn: col }}>
-                      {playerElements}
+                      {activePlayersHere.map(p => {
+                          const isActive = gameData.currentPlayerIdx === p.id;
+                          let tX = 0; let tY = 0;
+                          if (!isActive) {
+                              const pos = INACTIVE_OFFSETS[inactiveCount % INACTIVE_OFFSETS.length];
+                              tX = pos.x; tY = pos.y;
+                              inactiveCount++;
+                          }
+
+                          return (
+                              <div key={p.id} className={`absolute transition-all duration-500 ease-out pointer-events-auto flex flex-col items-center ${isActive ? 'z-50' : 'z-10'}`} style={{ transform: `translate(${tX}px, ${tY}px)` }}>
+                                  
+                                  {gameData.gameState === 'MOVING' && gameData.currentPlayerIdx === p.id && gameData.remainingSteps > 0 && (
+                                      <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-[150] w-24 flex justify-center">
+                                        <div className="bg-sky-400 border-[6px] border-white text-white font-black rounded-full w-24 h-24 flex items-center justify-center text-[3rem] shadow-[0_10px_20px_rgba(0,0,0,0.15)] animate-bounce">
+                                          {gameData.remainingSteps}
+                                        </div>
+                                      </div>
+                                  )}
+
+                                  {p.inJail && <div className="absolute -top-6 -right-6 text-4xl animate-pulse drop-shadow-md z-40 bg-white p-1 rounded-full border-2 border-slate-100">🙏</div>}
+                                  
+                                  <div onClick={(e) => { if (p.id === activePlayerIndex && (!myPlayer || !myPlayer.isAI)) { e.stopPropagation(); setShowAssetManager(true); } }} className={`w-20 h-20 bg-white rounded-full border-[6px] flex items-center justify-center text-[3rem] shadow-[0_8px_15px_rgba(0,0,0,0.1)] transition-all duration-500 ${isActive ? 'border-amber-400 scale-125 z-40 relative' : 'border-slate-200 scale-[0.65] grayscale opacity-70 z-10'} ${p.id === activePlayerIndex && !p.isAI ? 'cursor-pointer hover:ring-[6px] hover:ring-sky-300 hover:scale-[1.4] hover:grayscale-0 hover:opacity-100' : ''}`}>
+                                      {p.icon}
+                                      {p.id === activePlayerIndex && !p.isBankrupt && (!myPlayer || !myPlayer.isAI) && (
+                                        <div className="absolute -bottom-2 -right-2 bg-amber-400 text-amber-900 p-1.5 rounded-full shadow-md border-4 border-white z-50 animate-bounce">
+                                           <Briefcase size={18} strokeWidth={3} />
+                                        </div>
+                                      )}
+                                  </div>
+
+                                  {isMyTurnOnThisCell && p.id === activePlayerIndex && !(myPlayer?.isBankrupt) && gameData.gameState === 'IDLE' && !(myPlayer?.inJail) && !isTradeActive && (
+                                      <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 z-[200]">
+                                        <div className="flex flex-col items-center gap-3 animate-in slide-in-from-bottom-4 duration-300" style={{ transform: `scale(${inverseZoom})`, transformOrigin: 'bottom center' }}>
+                                          {myPlayer?.isAI ? (
+                                              <div className="whitespace-nowrap px-6 py-3 bg-slate-700 text-white rounded-[2rem] font-black text-xl shadow-lg flex items-center gap-2 animate-pulse border-[3px] border-slate-500">
+                                                🤖 思考中...
+                                              </div>
+                                          ) : (
+                                              <button onClick={handleRollDice} className="whitespace-nowrap px-8 py-4 bg-sky-400 hover:bg-sky-300 text-white rounded-[2rem] font-black text-3xl shadow-[0_8px_0_0_#0284c7,0_10px_20px_rgba(0,0,0,0.15)] active:shadow-none active:translate-y-[8px] active:border-b-0 transition-all flex items-center gap-3 border-[4px] border-white animate-bounce">
+                                                <Dice5 size={32} strokeWidth={3} /> 擲骰子
+                                              </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                  )}
+                              </div>
+                          );
+                      })}
                   </div>
               </div>
           );
-      }
-      return elements;
+      });
   };
-
-  const topBarPlayersUI = renderTopBarPlayers();
-  const selectedSquareModalUI = renderSelectedSquareModal();
-  const assetManagerModalUI = renderAssetManagerModal();
-  const diceRollingAnimationUI = renderDiceRollingAnimation();
-  const bwaBweiRollingAnimationUI = renderBwaBweiRollingAnimation();
-  const tradeOrActionModalUI = renderTradeOrActionModal();
-  const boardSquaresUI = renderBoardSquares();
-  const timeLeftStr = formatTime(localTimeLeft);
-
-  const playerCountOptionsUI = renderPlayerCountOptions();
-  const timeLimitOptionsUI = renderTimeLimitOptions();
-  const localPlayersUI = renderLocalPlayers();
-  const childAvatarsLocalUI = renderChildAvatarsLocal();
-  const childAvatarsJoinUI = renderChildAvatarsJoin();
-  const rankedPlayersUI = renderRankedPlayers();
 
   if (appPhase === 'LANDING') {
     return (
       <div className="min-h-screen w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-4 md:p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
-        <style>{`
-          .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-          .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-          .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        `}</style>
+        <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }`}</style>
         
-        <div className="absolute top-10 left-10 w-32 h-32 bg-white/40 rounded-full blur-xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-20 w-48 h-48 bg-pink-300/20 rounded-full blur-2xl animate-pulse delay-700"></div>
+        <div className="absolute top-10 left-10 w-32 h-32 bg-white/40 rounded-full blur-xl animate-pulse" />
+        <div className="absolute bottom-20 right-20 w-48 h-48 bg-pink-300/20 rounded-full blur-2xl animate-pulse delay-700" />
 
         <h1 className="text-5xl md:text-[4.5rem] font-black mb-4 md:mb-6 text-sky-500 tracking-widest drop-shadow-[0_6px_0_rgba(2,132,199,0.2)] text-center leading-tight">
           大信翁
@@ -1808,19 +1486,16 @@ export default function App() {
           
           {setupMode === 'INIT' && (
             <div className="flex flex-col gap-4 w-full">
-              <button onClick={handleSetSetupModeLocal} className="py-4 md:py-5 rounded-[2rem] text-2xl md:text-3xl bg-amber-400 text-amber-900 border-[6px] border-white shadow-[0_6px_0_0_#d97706,0_10px_15px_rgba(0,0,0,0.1)] hover:-translate-y-1 hover:bg-amber-300 active:border-b-[0px] active:translate-y-[6px] active:shadow-none transition-all relative overflow-hidden group">
-                單機同樂 🎪
-                <span className="text-sm block font-bold text-amber-800/70 mt-1">大家一起圍著螢幕玩</span>
+              <button onClick={() => setSetupMode('LOCAL')} className="py-4 md:py-5 rounded-[2rem] text-2xl md:text-3xl bg-amber-400 text-amber-900 border-[6px] border-white shadow-[0_6px_0_0_#d97706,0_10px_15px_rgba(0,0,0,0.1)] hover:-translate-y-1 hover:bg-amber-300 active:border-b-[0px] active:translate-y-[6px] active:shadow-none transition-all relative overflow-hidden group">
+                單機同樂 🎪 <span className="text-sm block font-bold text-amber-800/70 mt-1">大家一起圍著螢幕玩</span>
               </button>
               <div className="flex items-center gap-4 my-1 opacity-40">
-                <div className="flex-1 h-1.5 bg-sky-200 rounded-full"></div>
-                <span className="font-black text-sky-800 text-sm tracking-widest">線上模式</span>
-                <div className="flex-1 h-1.5 bg-sky-200 rounded-full"></div>
+                <div className="flex-1 h-1.5 bg-sky-200 rounded-full" /><span className="font-black text-sky-800 text-sm tracking-widest">線上模式</span><div className="flex-1 h-1.5 bg-sky-200 rounded-full" />
               </div>
-              <button disabled={!user} onClick={handleSetSetupModeCreate} className={`py-4 rounded-[2rem] text-xl md:text-2xl border-[5px] border-white shadow-[0_5px_0_0_#0ea5e9,0_8px_10px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[5px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_5px_0_0_#cbd5e1]' : 'bg-sky-400 text-sky-900 hover:bg-sky-300'}`}>
+              <button disabled={!user} onClick={() => setSetupMode('CREATE')} className={`py-4 rounded-[2rem] text-xl md:text-2xl border-[5px] border-white shadow-[0_5px_0_0_#0ea5e9,0_8px_10px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[5px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_5px_0_0_#cbd5e1]' : 'bg-sky-400 text-sky-900 hover:bg-sky-300'}`}>
                 {user ? "創建連線房間 🏠" : "雲端連線中..."}
               </button>
-              <button disabled={!user} onClick={handleSetSetupModeJoin} className={`py-4 rounded-[2rem] text-xl md:text-2xl border-[5px] border-white shadow-[0_5px_0_0_#10b981,0_8px_10px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[5px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_5px_0_0_#cbd5e1]' : 'bg-emerald-400 text-emerald-900 hover:bg-emerald-300'}`}>
+              <button disabled={!user} onClick={() => setSetupMode('JOIN')} className={`py-4 rounded-[2rem] text-xl md:text-2xl border-[5px] border-white shadow-[0_5px_0_0_#10b981,0_8px_10px_rgba(0,0,0,0.1)] hover:-translate-y-1 active:border-b-[0px] active:translate-y-[5px] active:shadow-none transition-all ${!user ? 'bg-slate-200 text-slate-400 shadow-[0_5px_0_0_#cbd5e1]' : 'bg-emerald-400 text-emerald-900 hover:bg-emerald-300'}`}>
                 加入好友房間 🚀
               </button>
             </div>
@@ -1831,17 +1506,13 @@ export default function App() {
               <div className="flex flex-col md:flex-row w-full gap-6">
                 <div className="flex-1 flex flex-col justify-center gap-4">
                   <div className="w-full">
-                    <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><UsersIcon size={20}></UsersIcon> 幾個人一起玩呢？</div>
-                    <div className="flex flex-wrap justify-center gap-2 md:gap-3">
-                      {playerCountOptionsUI}
-                    </div>
+                    <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><UsersIcon size={20} /> 幾個人一起玩呢？</div>
+                    <div className="flex flex-wrap justify-center gap-2 md:gap-3">{renderPlayerCountOptions()}</div>
                   </div>
-                  <div className="w-full border-t-[3px] border-dashed border-sky-100"></div>
+                  <div className="w-full border-t-[3px] border-dashed border-sky-100" />
                   <div className="w-full">
-                    <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><Clock size={20}></Clock> 玩多久呢？</div>
-                    <div className="flex flex-wrap justify-center gap-2 md:gap-3">
-                      {timeLimitOptionsUI}
-                    </div>
+                    <div className="text-center text-sky-700 mb-2 md:mb-3 flex items-center justify-center gap-2 text-lg"><Clock size={20} /> 玩多久呢？</div>
+                    <div className="flex flex-wrap justify-center gap-2 md:gap-3">{renderTimeLimitOptions()}</div>
                   </div>
                 </div>
 
@@ -1849,40 +1520,42 @@ export default function App() {
                   {setupMode === 'LOCAL' ? (
                     <div className="w-full bg-sky-50 rounded-[2rem] p-4 md:p-5 border-4 border-white shadow-sm h-full flex flex-col">
                       <div className="text-center text-sky-800 mb-2 md:mb-3 text-base md:text-lg">幫角色取名字＆換頭像吧！👇</div>
-                      <div className="flex flex-wrap justify-center gap-2 md:gap-3 mb-3 md:mb-4">
-                        {localPlayersUI}
-                      </div>
+                      <div className="flex flex-wrap justify-center gap-2 md:gap-3 mb-3 md:mb-4">{renderLocalPlayers()}</div>
                       <div className="flex justify-center mt-2 mb-3">
-                        <button 
-                          onClick={handleLocalTypeToggle}
-                          className={`px-4 py-1.5 rounded-full border-[3px] text-sm md:text-base font-black transition-all shadow-sm flex items-center gap-1 ${localPlayerTypes[editingLocalPlayer] === 'AI' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-emerald-100 border-emerald-300 text-emerald-700'}`}
-                        >
+                        <button onClick={() => {
+                            const nextTypes = localPlayerTypes.slice();
+                            nextTypes[editingLocalPlayer] = nextTypes[editingLocalPlayer] === 'HUMAN' ? 'AI' : 'HUMAN';
+                            setLocalPlayerTypes(nextTypes);
+                        }} className={`px-4 py-1.5 rounded-full border-[3px] text-sm md:text-base font-black transition-all shadow-sm flex items-center gap-1 ${localPlayerTypes[editingLocalPlayer] === 'AI' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-emerald-100 border-emerald-300 text-emerald-700'}`}>
                           {localPlayerTypes[editingLocalPlayer] === 'AI' ? '🤖 電腦控制' : '🧑 玩家控制'}
                         </button>
                       </div>
                       <div className="mb-3 w-full max-w-[200px] mx-auto">
-                        <input type="text" value={localNames[editingLocalPlayer]} onChange={handleLocalNameChange} placeholder={`玩家 ${editingLocalPlayer + 1} 名字`} className="w-full bg-white px-3 py-2 rounded-xl text-center text-sm md:text-base font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors"></input>
+                        <input type="text" value={localNames[editingLocalPlayer]} onChange={e => {
+                            const nextNames = localNames.slice();
+                            nextNames[editingLocalPlayer] = e.target.value.substring(0, 6);
+                            setLocalNames(nextNames);
+                        }} placeholder={`玩家 ${editingLocalPlayer + 1} 名字`} className="w-full bg-white px-3 py-2 rounded-xl text-center text-sm md:text-base font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors" />
                       </div>
                       <div className="flex flex-wrap justify-center gap-2 max-h-24 md:max-h-32 overflow-y-auto p-2 bg-white rounded-[1.5rem] border-2 border-sky-100 custom-scrollbar mt-auto">
-                        {childAvatarsLocalUI}
+                        {renderChildAvatarsLocal()}
                       </div>
                     </div>
                   ) : (
                     <div className="w-full bg-sky-50 rounded-[2rem] p-5 md:p-6 border-4 border-white shadow-sm h-full flex flex-col justify-center">
                       <div className="text-center text-sky-800 mb-2 md:mb-3 text-lg md:text-xl">你的專屬角色與名字！</div>
                       <div className="mb-4 w-full max-w-[200px] mx-auto">
-                        <input type="text" value={setupName} onChange={handleSetupNameChange} placeholder="輸入你的名字" className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors"></input>
+                        <input type="text" value={setupName} onChange={e => setSetupName(e.target.value.substring(0, 6))} placeholder="輸入你的名字" className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors" />
                       </div>
                       <div className="flex flex-wrap justify-center gap-2 md:gap-3 max-h-36 md:max-h-48 overflow-y-auto p-2 custom-scrollbar">
-                        {childAvatarsJoinUI}
+                        {renderChildAvatarsJoin()}
                       </div>
                     </div>
                   )}
                 </div>
               </div>
-
               <div className="flex w-full gap-3 md:gap-4 mt-2 max-w-lg mx-auto">
-                <button onClick={handleSetSetupModeInit} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
+                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
                 <button onClick={setupMode === 'LOCAL' ? handleStartLocalGame : handleCreateRoom} className="flex-[2] py-3 md:py-4 text-white bg-emerald-400 rounded-[2rem] shadow-[0_5px_0_0_#10b981] hover:-translate-y-1 active:translate-y-[5px] active:shadow-none active:border-b-0 transition-all text-xl md:text-2xl border-[4px] border-white">出發囉！✨</button>
               </div>
             </div>
@@ -1894,23 +1567,23 @@ export default function App() {
                 <div className="flex-1 flex flex-col justify-center gap-5">
                   <div className="w-full">
                     <div className="text-center text-sky-700 mb-3 text-lg md:text-xl">請輸入房間密碼 🔑</div>
-                    <input type="text" placeholder="A1B2C3" value={roomId} onChange={handleRoomIdChange} className="w-full bg-white p-4 md:p-5 rounded-[2rem] text-center text-3xl md:text-4xl font-black border-[4px] border-sky-200 focus:border-amber-400 outline-none uppercase tracking-widest text-[#4a3424] shadow-inner"></input>
+                    <input type="text" placeholder="A1B2C3" value={roomId} onChange={e => setRoomId(e.target.value.toUpperCase())} className="w-full bg-white p-4 md:p-5 rounded-[2rem] text-center text-3xl md:text-4xl font-black border-[4px] border-sky-200 focus:border-amber-400 outline-none uppercase tracking-widest text-[#4a3424] shadow-inner" />
                   </div>
                 </div>
                 <div className="flex-[1.2] flex flex-col">
                   <div className="w-full bg-sky-50 rounded-[2rem] p-5 border-4 border-white shadow-sm h-full flex flex-col justify-center">
                     <div className="text-center text-sky-800 mb-2 md:mb-3 text-lg md:text-xl">你的專屬角色與名字！</div>
                     <div className="mb-4 w-full max-w-[200px] mx-auto">
-                      <input type="text" value={setupName} onChange={handleSetupNameChange} placeholder="輸入你的名字" className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors"></input>
+                      <input type="text" value={setupName} onChange={e => setSetupName(e.target.value.substring(0, 6))} placeholder="輸入你的名字" className="w-full bg-white px-4 py-2.5 rounded-2xl text-center text-lg md:text-xl font-black border-4 border-sky-200 focus:border-amber-400 outline-none text-[#4a3424] shadow-inner transition-colors" />
                     </div>
                     <div className="flex flex-wrap justify-center gap-2 md:gap-3 max-h-36 overflow-y-auto p-2 custom-scrollbar">
-                      {childAvatarsJoinUI}
+                      {renderChildAvatarsJoin()}
                     </div>
                   </div>
                 </div>
               </div>
               <div className="flex w-full gap-3 md:gap-4 mt-2 max-w-lg mx-auto">
-                <button onClick={handleSetSetupModeInit} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
+                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
                 <button disabled={roomId.length < 4} onClick={handleJoinRoom} className={`flex-[2] py-3 md:py-4 text-white rounded-[2rem] transition-all text-xl md:text-2xl border-[4px] border-white ${roomId.length < 4 ? 'bg-slate-300 border-slate-200' : 'bg-sky-400 shadow-[0_5px_0_0_#0ea5e9] hover:-translate-y-1 active:translate-y-[5px] active:shadow-none active:border-b-0'}`}>加入房間 🚀</button>
               </div>
             </div>
@@ -1924,52 +1597,47 @@ export default function App() {
   if (gameData.gameState === 'GAME_OVER') {
      return (
         <div className="min-h-screen w-screen bg-[#fff8e7] flex flex-col items-center justify-center p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
-            <PartyPopper size={120} className="text-pink-400 mb-6 animate-bounce drop-shadow-md"></PartyPopper>
+            <PartyPopper size={120} className="text-pink-400 mb-6 animate-bounce drop-shadow-md" />
             <h1 className="text-[5rem] font-black mb-10 text-amber-500 drop-shadow-[0_6px_0_rgba(217,119,6,0.2)]">遊戲結束囉！🎉</h1>
             <div className="bg-white p-10 rounded-[3rem] w-full max-w-xl shadow-[0_20px_50px_rgba(0,0,0,0.05)] border-[8px] border-amber-200 relative">
                 <h2 className="text-3xl font-black mb-8 text-amber-600 border-b-4 border-dashed border-amber-100 pb-6 text-center">🏆 大信翁排行榜 🏆</h2>
-                {rankedPlayersUI}
+                {renderRankedPlayers()}
             </div>
-            <button onClick={handleExitConfirmConfirm} className="mt-10 px-10 py-5 bg-sky-400 text-sky-900 rounded-[2.5rem] font-black text-2xl shadow-[0_8px_0_0_#0ea5e9] border-[6px] border-white hover:-translate-y-1 active:translate-y-[8px] active:shadow-none transition-all">再玩一次！</button>
+            <button onClick={() => window.location.reload()} className="mt-10 px-10 py-5 bg-sky-400 text-sky-900 rounded-[2.5rem] font-black text-2xl shadow-[0_8px_0_0_#0ea5e9] border-[6px] border-white hover:-translate-y-1 active:translate-y-[8px] active:shadow-none transition-all">再玩一次！</button>
         </div>
      );
   }
 
   return (
     <div className="h-screen w-screen bg-[#e0f2fe] overflow-hidden relative touch-none select-none font-black text-[#4a3424] flex flex-col">
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-      `}</style>
+      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }`}</style>
       
       {/* 頂部玩家資訊列 */}
       <div className="absolute top-6 left-6 right-24 z-[150] flex gap-4 overflow-x-auto pb-6 px-2 pointer-events-auto items-center custom-scrollbar">
         <div className="bg-white text-rose-500 rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center shadow-md h-[75px] shrink-0 border-4 border-rose-200">
-          <Timer size={20} className={localTimeLeft < 60 && localTimeLeft > 0 ? "animate-pulse" : ""}></Timer> 
-          <span className="text-xl font-black mt-1">{timeLeftStr}</span>
+          <Timer size={20} className={localTimeLeft < 60 && localTimeLeft > 0 ? "animate-pulse" : ""} /> 
+          <span className="text-xl font-black mt-1">{formatTime(localTimeLeft)}</span>
         </div>
         <div className={`bg-white rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center font-black shadow-md h-[75px] shrink-0 border-4 tracking-wider ${isOfflineMode ? 'border-emerald-300 text-emerald-700' : 'border-sky-300 text-sky-700'}`}>
           <div className="text-xs opacity-70">{isOfflineMode ? '模式' : '房號'}</div>
           <div className="text-xl mt-1">{isOfflineMode ? '單機同樂 🎪' : roomId}</div>
         </div>
-        <div className="w-1.5 h-10 bg-sky-200/50 mx-2 rounded-full shrink-0"></div>
-        {topBarPlayersUI}
+        <div className="w-1.5 h-10 bg-sky-200/50 mx-2 rounded-full shrink-0" />
+        {renderTopBarPlayers()}
       </div>
 
       {/* 右下角可折合選單 */}
       <div className="absolute right-4 bottom-8 md:right-6 md:bottom-10 flex flex-col items-end z-[150] pointer-events-auto">
         <div className={`flex flex-col items-end gap-3 transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-[500px] opacity-100 pb-3 pointer-events-auto' : 'max-h-0 opacity-0 pointer-events-none'}`}>
-          <button onClick={handleMenuZoomIn} className="h-14 px-5 bg-white/95 backdrop-blur-md rounded-full border-4 border-sky-100 flex items-center gap-3 font-black text-sky-600 shadow-lg active:scale-95 transition-all">放大畫面 <ZoomIn size={24}></ZoomIn></button>
-          <button onClick={handleMenuFindPlayer} className="h-14 px-5 bg-white/95 backdrop-blur-md rounded-full border-4 border-sky-100 flex items-center gap-3 font-black text-sky-600 shadow-lg active:scale-95 transition-all">找回角色 <Target size={24}></Target></button>
-          <button onClick={handleMenuZoomOut} className="h-14 px-5 bg-white/95 backdrop-blur-md rounded-full border-4 border-sky-100 flex items-center gap-3 font-black text-sky-600 shadow-lg active:scale-95 transition-all">縮小畫面 <ZoomOut size={24}></ZoomOut></button>
-          <button onClick={handleMenuToggleMap} className={`h-14 px-5 backdrop-blur-md rounded-full border-4 flex items-center gap-3 font-black shadow-lg active:scale-95 transition-all ${isFullMapMode ? 'bg-sky-400 text-white border-white' : 'bg-white/95 text-sky-600 border-sky-100'}`}>{isFullMapMode ? '關閉全覽' : '全覽地圖'}<Menu size={24}></Menu></button>
-          <button onClick={handleMuteToggle} className="h-14 px-5 bg-white/95 backdrop-blur-md rounded-full border-4 border-amber-100 flex items-center gap-3 font-black text-amber-500 shadow-lg active:scale-95 transition-all">{isMuted ? '開啟音效' : '關閉音效'} {isMuted ? <VolumeX size={24}></VolumeX> : <Volume2 size={24}></Volume2>}</button>
-          <button onClick={handleMenuExit} className="h-14 px-5 bg-white/95 backdrop-blur-md rounded-full border-4 border-rose-100 flex items-center gap-3 font-black text-rose-500 shadow-lg active:scale-95 transition-all">離開遊戲 <LogOut size={24}></LogOut></button>
+          <button onClick={() => { setZoom(z => Math.min(z + 0.1, 1.5)); setIsMenuOpen(false); }} className="h-14 px-5 bg-white/95 backdrop-blur-md rounded-full border-4 border-sky-100 flex items-center gap-3 font-black text-sky-600 shadow-lg active:scale-95 transition-all">放大畫面 <ZoomIn size={24} /></button>
+          <button onClick={() => { focusOnCurrentPlayer(); setIsMenuOpen(false); }} className="h-14 px-5 bg-white/95 backdrop-blur-md rounded-full border-4 border-sky-100 flex items-center gap-3 font-black text-sky-600 shadow-lg active:scale-95 transition-all">找回角色 <Target size={24} /></button>
+          <button onClick={() => { setZoom(z => Math.max(z - 0.1, 0.4)); setIsMenuOpen(false); }} className="h-14 px-5 bg-white/95 backdrop-blur-md rounded-full border-4 border-sky-100 flex items-center gap-3 font-black text-sky-600 shadow-lg active:scale-95 transition-all">縮小畫面 <ZoomOut size={24} /></button>
+          <button onClick={() => { setIsFullMapMode(!isFullMapMode); setIsMenuOpen(false); }} className={`h-14 px-5 backdrop-blur-md rounded-full border-4 flex items-center gap-3 font-black shadow-lg active:scale-95 transition-all ${isFullMapMode ? 'bg-sky-400 text-white border-white' : 'bg-white/95 text-sky-600 border-sky-100'}`}>{isFullMapMode ? '關閉全覽' : '全覽地圖'}<Menu size={24} /></button>
+          <button onClick={() => setIsMuted(!isMuted)} className="h-14 px-5 bg-white/95 backdrop-blur-md rounded-full border-4 border-amber-100 flex items-center gap-3 font-black text-amber-500 shadow-lg active:scale-95 transition-all">{isMuted ? '開啟音效' : '關閉音效'} {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}</button>
+          <button onClick={() => { setShowExitConfirm(true); setIsMenuOpen(false); }} className="h-14 px-5 bg-white/95 backdrop-blur-md rounded-full border-4 border-rose-100 flex items-center gap-3 font-black text-rose-500 shadow-lg active:scale-95 transition-all">離開遊戲 <LogOut size={24} /></button>
         </div>
-        <button onClick={handleMenuToggle} className={`w-16 h-16 md:w-20 md:h-20 rounded-full shadow-2xl flex items-center justify-center border-[5px] transition-all duration-300 transform ${isMenuOpen ? 'bg-sky-400 border-white rotate-90 scale-95 text-white' : 'bg-white/90 backdrop-blur-md border-sky-100 text-sky-500 hover:scale-105 active:scale-95'}`}>
-          {isMenuOpen ? <X size={36} strokeWidth={3}></X> : <Menu size={36} strokeWidth={3}></Menu>}
+        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className={`w-16 h-16 md:w-20 md:h-20 rounded-full shadow-2xl flex items-center justify-center border-[5px] transition-all duration-300 transform ${isMenuOpen ? 'bg-sky-400 border-white rotate-90 scale-95 text-white' : 'bg-white/90 backdrop-blur-md border-sky-100 text-sky-500 hover:scale-105 active:scale-95'}`}>
+          {isMenuOpen ? <X size={36} strokeWidth={3} /> : <Menu size={36} strokeWidth={3} />}
         </button>
       </div>
 
@@ -1977,31 +1645,48 @@ export default function App() {
       {showExitConfirm && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto">
           <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full mx-4 animate-in zoom-in-95 spin-in-1 border-[8px] border-rose-100">
-            <div className="text-rose-500 bg-rose-50 p-6 rounded-full border-4 border-white shadow-inner"><LogOut size={48} className="ml-1" strokeWidth={2.5}></LogOut></div>
+            <div className="text-rose-500 bg-rose-50 p-6 rounded-full border-4 border-white shadow-inner"><LogOut size={48} className="ml-1" strokeWidth={2.5} /></div>
             <h3 className="text-3xl font-black text-slate-700">要離開遊戲嗎？🥺</h3>
             <p className="text-slate-400 text-center text-lg">離開後目前的進度就不見囉！</p>
             <div className="flex gap-4 w-full mt-4">
-              <button onClick={handleExitConfirmClose} className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 text-xl rounded-[2rem] transition-colors border-4 border-white shadow-sm">按錯了啦</button>
-              <button onClick={handleExitConfirmConfirm} className="flex-1 py-4 bg-rose-400 hover:bg-rose-300 text-white text-xl rounded-[2rem] shadow-[0_5px_0_0_#e11d48] active:translate-y-[5px] active:shadow-none transition-all border-4 border-white">確定離開</button>
+              <button onClick={() => setShowExitConfirm(false)} className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 text-xl rounded-[2rem] transition-colors border-4 border-white shadow-sm">按錯了啦</button>
+              <button onClick={() => window.location.reload()} className="flex-1 py-4 bg-rose-400 hover:bg-rose-300 text-white text-xl rounded-[2rem] shadow-[0_5px_0_0_#e11d48] active:translate-y-[5px] active:shadow-none transition-all border-4 border-white">確定離開</button>
             </div>
           </div>
         </div>
       )}
 
-      {tradeOrActionModalUI}
-      {selectedSquareModalUI}
-      {assetManagerModalUI}
-      {diceRollingAnimationUI}
-      {bwaBweiRollingAnimationUI}
+      {renderTradeOrActionModal()}
+      {renderSelectedSquareModal()}
+      {renderAssetManagerModal()}
+      {gameData.gameState === 'ROLLING' && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+          <div className="flex gap-10 bg-white/80 p-12 rounded-[4rem] backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-sky-100 animate-in zoom-in spin-in-3">
+            <DiceIcon value={safeDice[0]} className="w-36 h-36 text-sky-400 animate-bounce drop-shadow-md" style={{ animationDelay: '0s' }} strokeWidth={1.5} />
+            <DiceIcon value={safeDice[1]} className="w-36 h-36 text-pink-400 animate-bounce drop-shadow-md" style={{ animationDelay: '0.1s' }} strokeWidth={1.5} />
+          </div>
+        </div>
+      )}
+      {gameData.gameState === 'BWA_BWEI_ROLLING' && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center gap-8 bg-white/90 p-12 rounded-[4rem] backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[8px] border-rose-100 animate-in zoom-in spin-in-3">
+            <div className="text-rose-500 font-black text-4xl animate-pulse drop-shadow-sm">🙏 神明請指示...</div>
+            <div className="flex gap-12 h-32 items-center justify-center">
+              <div className="animate-[bounce_0.4s_infinite_alternate]"><div className="animate-[spin_0.3s_linear_infinite]"><BweiBlock isFlat={false} className="scale-[1.5]" /></div></div>
+              <div className="animate-[bounce_0.5s_infinite_alternate-reverse]"><div className="animate-[spin_0.4s_linear_infinite_reverse]"><BweiBlock isFlat={true} className="scale-[1.5] scale-x-[-1]" /></div></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 地圖層 */}
       <div ref={mapRef} className="flex-grow relative w-full h-full cursor-grab active:cursor-grabbing overflow-hidden z-10">
         <div 
           className="absolute top-0 left-0 origin-top-left transition-transform duration-700 ease-out pointer-events-none" 
-          style={{ width: MAP_SIZE + 'px', height: MAP_SIZE + 'px', transform: 'translate(' + (cameraOffset.x + manualOffset.x) + 'px, ' + (cameraOffset.y + manualOffset.y) + 'px) scale(' + displayZoom + ')' }}
+          style={{ width: `${MAP_SIZE}px`, height: `${MAP_SIZE}px`, transform: `translate(${cameraOffset.x + manualOffset.x}px, ${cameraOffset.y + manualOffset.y}px) scale(${displayZoom})` }}
         >
           <div className="w-full h-full p-10 bg-[#fff8e7] rounded-[4rem] shadow-[0_30px_60px_rgba(0,0,0,0.08)] border-[20px] border-[#fde047]" style={{ display: 'grid', gridTemplateColumns: 'repeat(11, 1fr)', gridTemplateRows: 'repeat(11, 1fr)', gap: '10px' }}>
-            {boardSquaresUI}
+            {renderBoardSquares()}
           </div>
         </div>
       </div>
