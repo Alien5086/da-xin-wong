@@ -3,7 +3,7 @@ import {
   Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, 
   Timer, Target, Volume2, VolumeX, 
   LogOut, Star, Users as UsersIcon, Clock,
-  Briefcase, X, PartyPopper, Handshake,
+  Briefcase, X, PartyPopper,
   ZoomIn, ZoomOut, Menu
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
@@ -1285,12 +1285,15 @@ export default function App() {
 
   if (appPhase === 'LANDING') {
     return (
-      <div className="min-h-screen w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-4 md:p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
-        <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }`}</style>
+      <div className="min-h-screen w-screen bg-[#e0f2fe] flex flex-col items-center justify-center p-4 md:p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+          .custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        `}</style>
         <div className="absolute top-10 left-10 w-32 h-32 bg-white/40 rounded-full blur-xl animate-pulse" />
         <div className="absolute bottom-20 right-20 w-48 h-48 bg-pink-300/20 rounded-full blur-2xl animate-pulse delay-700" />
         <h1 className="text-5xl md:text-[4.5rem] font-black mb-4 md:mb-6 text-sky-500 tracking-widest drop-shadow-[0_6px_0_rgba(2,132,199,0.2)] text-center leading-tight">
-          大信翁<span className="block text-xl md:text-2xl text-rose-400 mt-1 tracking-normal">Candy Bubble Edition 🍬</span>
+          大信翁<span className="block text-xl md:text-2xl text-rose-400 mt-1 tracking-normal">糖果泡泡版 🍬</span>
         </h1>
         {errorMsg && <div className="mb-4 bg-rose-100 text-rose-700 p-3 rounded-2xl border-4 border-rose-300 shadow-sm">{errorMsg}</div>}
         <div className={`bg-white/90 backdrop-blur-md border-[6px] border-sky-200 p-6 md:p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] w-full transition-all duration-300 relative z-10 ${setupMode === 'INIT' ? 'max-w-md flex flex-col items-center gap-5' : 'max-w-4xl flex flex-col'}`}>
@@ -1392,7 +1395,7 @@ export default function App() {
 
   if (gameData.gameState === 'GAME_OVER') {
      return (
-        <div className="min-h-screen w-screen bg-[#fff8e7] flex flex-col items-center justify-center p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black">
+        <div className="min-h-screen w-screen bg-[#fff8e7] flex flex-col items-center justify-center p-6 text-[#4a3424] overflow-x-hidden absolute inset-0 font-black" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
             <PartyPopper size={120} className="text-pink-400 mb-6 animate-bounce drop-shadow-md" />
             <h1 className="text-[5rem] font-black mb-10 text-amber-500 drop-shadow-[0_6px_0_rgba(217,119,6,0.2)]">遊戲結束囉！🎉</h1>
             <div className="bg-white p-10 rounded-[3rem] w-full max-w-xl shadow-[0_20px_50px_rgba(0,0,0,0.05)] border-[8px] border-amber-200 relative">
@@ -1405,8 +1408,11 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-screen bg-[#e0f2fe] overflow-hidden relative touch-none select-none font-black text-[#4a3424] flex flex-col">
-      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }`}</style>
+    <div className="h-screen w-screen bg-[#e0f2fe] overflow-hidden relative touch-none select-none font-black text-[#4a3424] flex flex-col" style={{ fontFamily: "'Noto Sans TC', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      `}</style>
       
       <div className="absolute top-6 left-6 right-24 z-[150] flex gap-4 overflow-x-auto pb-6 px-2 pointer-events-auto items-center custom-scrollbar">
         <div className="bg-white text-rose-500 rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center shadow-md h-[75px] shrink-0 border-4 border-rose-200">
@@ -1603,7 +1609,7 @@ export default function App() {
                  </div>
               ) : (
                  <>
-                    <div className="bg-emerald-50 p-6 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-2 border-4 border-white shadow-inner text-emerald-500"><Handshake size={48} /></div>
+                    <div className="bg-emerald-50 p-6 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-2 border-4 border-white shadow-inner"><span className="text-[3rem] drop-shadow-sm">🤝</span></div>
                     <h2 className="text-3xl font-black text-slate-700">🤝 產權購買邀請</h2>
                     <p className="text-xl text-slate-500 leading-relaxed font-black">玩家 <span className="text-amber-600">{gameData.players[gameData.pendingTrade.sellerIdx].name}</span> <br/>想以 <span className="text-emerald-500 font-black">${gameData.pendingTrade.price}</span> 出售 <br/><span className="text-sky-600 font-black">{BOARD_SQUARES[gameData.pendingTrade.sqId].name}</span> 給 <span className="text-emerald-600">{tradeBuyer?.name || ''}</span>！</p>
                     <div className="flex gap-4 w-full">
