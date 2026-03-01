@@ -53,7 +53,7 @@ var INACTIVE_OFFSETS = [
   { x: 35, y: -35 }, { x: 0, y: -45 }, { x: 0, y: 45 }     
 ];
 
-var CHILD_AVATARS = ['👦', '👧', '👶', '👼', '👲', '👸', '🤴', '🤓', '🤠', '😎', '👻', '👽', '🤖', '👾', '測試', '🐼'];
+var CHILD_AVATARS = ['👦', '👧', '👶', '👼', '👲', '👸', '🤴', '🤓', '🤠', '😎', '👻', '👽', '🤖', '👾', '🤡', '🐼'];
 
 var GOOD_CARDS = JSON.parse(`[{"desc":"扶老奶奶過馬路","effectM":200,"effectT":3},{"desc":"考試考一百分","effectM":500,"effectT":2},{"desc":"拾金不昧","effectM":300,"effectT":5},{"desc":"當選模範生","effectM":1000,"effectT":5},{"desc":"主動打掃教室","effectM":100,"effectT":2}]`);
 var BAD_CARDS = JSON.parse(`[{"desc":"遺失錢包","effectM":-300,"effectT":-2},{"desc":"隨地亂丟垃圾","effectM":-200,"effectT":-3},{"desc":"打破鄰居玻璃","effectM":-400,"effectT":-2},{"desc":"上課遲到","effectM":-100,"effectT":-2},{"desc":"對同學說謊被抓到","effectM":0,"effectT":-5},{"desc":"做壞事進反省泡泡","effectM":0,"effectT":0,"goToJail":true}]`);
