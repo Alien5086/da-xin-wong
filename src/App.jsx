@@ -5,7 +5,7 @@ import {
   LogOut, Star, Users as UsersIcon, Clock,
   Briefcase, X, PartyPopper,
   ZoomIn, ZoomOut, Menu,
-  ChevronUp, ChevronDown
+  ChevronUp, ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -1416,33 +1416,47 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
       
-      <div className="absolute top-0 left-0 right-20 z-[150] pointer-events-none">
-        <div className={`relative transition-transform duration-500 ease-out ${isTopBarOpen ? 'translate-y-0' : 'translate-y-[-100%]'}`}>
-          <div className="flex gap-3 md:gap-4 overflow-x-auto pt-8 pb-6 px-4 md:px-6 pointer-events-auto items-center custom-scrollbar">
-            <div className="bg-white text-rose-500 rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center shadow-md h-[75px] shrink-0 border-4 border-rose-200">
-              <Timer size={20} className={localTimeLeft < 60 && localTimeLeft > 0 ? "animate-pulse" : ""} /> 
-              <span className="text-xl font-black mt-1">{formatTime(localTimeLeft)}</span>
-            </div>
-            <div className={`bg-white rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center font-black shadow-md h-[75px] shrink-0 border-4 tracking-wider ${isOfflineMode ? 'border-emerald-300 text-emerald-700' : 'border-sky-300 text-sky-700'}`}>
-              <div className="text-xs opacity-70">{isOfflineMode ? '模式' : '房號'}</div>
-              <div className="text-xl mt-1">{isOfflineMode ? '單機同樂 🎪' : roomId}</div>
-            </div>
-            <div className="w-1.5 h-10 bg-sky-200/50 mx-2 rounded-full shrink-0" />
-            {renderTopBarPlayers()}
+      {/* ================= 玩家名單面板 (從左側滑出) ================= */}
+      <div 
+        className="absolute top-6 left-0 z-[150] pointer-events-none flex items-start max-w-[95vw] transition-transform duration-500 ease-out"
+        style={{ transform: isTopBarOpen ? 'translateX(0)' : 'translateX(calc(-100% + 44px))' }}
+      >
+        {/* 內容區塊 */}
+        <div className="flex flex-1 min-w-0 gap-3 md:gap-4 overflow-x-auto p-4 md:p-5 bg-white/90 backdrop-blur-md rounded-r-[2rem] pointer-events-auto items-center custom-scrollbar shadow-[10px_10px_30px_rgba(0,0,0,0.1)] border-y-[4px] border-r-[4px] border-white">
+          <div className="bg-white text-rose-500 rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center shadow-md h-[75px] shrink-0 border-4 border-rose-200">
+            <Timer size={20} className={localTimeLeft < 60 && localTimeLeft > 0 ? "animate-pulse" : ""} /> 
+            <span className="text-xl font-black mt-1">{formatTime(localTimeLeft)}</span>
           </div>
-          
-          {/* 收合/展開按鈕 (小舌頭) */}
-          <button 
-            onClick={() => setIsTopBarOpen(!isTopBarOpen)}
-            className="absolute bottom-0 translate-y-full left-6 md:left-8 bg-white/95 backdrop-blur-md text-sky-600 border-[4px] border-t-0 border-white shadow-[0_8px_15px_rgba(0,0,0,0.1)] rounded-b-[1.5rem] px-5 py-2 flex items-center gap-2 hover:bg-sky-50 active:scale-95 transition-all cursor-pointer font-black pointer-events-auto z-50"
-          >
-            {isTopBarOpen ? (
-              <>收起 <ChevronUp size={22} strokeWidth={3} className="text-sky-400" /></>
-            ) : (
-              <><UsersIcon size={18} strokeWidth={3} /> 玩家名單 <ChevronDown size={22} strokeWidth={3} className="text-sky-400" /></>
-            )}
-          </button>
+          <div className={`bg-white rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center font-black shadow-md h-[75px] shrink-0 border-4 tracking-wider ${isOfflineMode ? 'border-emerald-300 text-emerald-700' : 'border-sky-300 text-sky-700'}`}>
+            <div className="text-xs opacity-70">{isOfflineMode ? '模式' : '房號'}</div>
+            <div className="text-xl mt-1">{isOfflineMode ? '單機同樂 🎪' : roomId}</div>
+          </div>
+          <div className="w-1.5 h-10 bg-sky-200/50 mx-2 rounded-full shrink-0" />
+          {renderTopBarPlayers()}
         </div>
+
+        {/* 收合/展開按鈕 (右側標籤) */}
+        <button 
+          onClick={() => setIsTopBarOpen(!isTopBarOpen)}
+          className="w-[44px] shrink-0 mt-4 bg-white/95 backdrop-blur-md text-sky-600 border-[4px] border-l-0 border-white shadow-[5px_5px_15px_rgba(0,0,0,0.1)] rounded-r-[1.5rem] py-4 flex flex-col items-center gap-2 hover:bg-sky-50 active:scale-95 transition-all cursor-pointer font-black pointer-events-auto z-50"
+        >
+          {isTopBarOpen ? (
+            <>
+              <ChevronLeft size={22} strokeWidth={3} className="text-sky-400" />
+              <div className="flex flex-col gap-0.5 items-center text-sm">
+                <span>收</span><span>起</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <ChevronRight size={22} strokeWidth={3} className="text-sky-400" />
+              <UsersIcon size={18} strokeWidth={3} className="mt-1" />
+              <div className="flex flex-col gap-0.5 items-center text-sm">
+                <span>玩</span><span>家</span>
+              </div>
+            </>
+          )}
+        </button>
       </div>
 
       <div className="absolute right-4 bottom-8 md:right-6 md:bottom-10 flex flex-col items-end z-[150] pointer-events-auto">
