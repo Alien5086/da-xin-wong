@@ -5,7 +5,8 @@ import {
   LogOut, Star, Users as UsersIcon, Clock,
   Briefcase, X, PartyPopper,
   ZoomIn, ZoomOut, Menu,
-  ChevronUp, ChevronDown, ChevronLeft, ChevronRight
+  ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
+  QrCode
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -387,6 +388,7 @@ export default function App() {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTopBarOpen, setIsTopBarOpen] = useState(true);
+  const [showQRModal, setShowQRModal] = useState(false); // 新增 QR Code 彈窗狀態
   
   const bgmRef = useRef(null);
   const [bgmStarted, setBgmStarted] = useState(false);
@@ -445,6 +447,18 @@ export default function App() {
   const isTradeActive = Boolean(gameData.pendingTrade && (isOfflineMode || pendingBuyerId === activePlayerIndex));
   const tradeBuyer = gameData.pendingTrade ? gameData.players[pendingBuyerId] : null;
   const tradeBuyerMoney = tradeBuyer ? Number(tradeBuyer.money || 0) : 0;
+
+  // 掃描 QR 碼帶入房間網址邏輯
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlRoomId = params.get('room');
+      if (urlRoomId) {
+        setRoomId(urlRoomId.toUpperCase());
+        setSetupMode('JOIN'); // 自動切換到加入房間畫面
+      }
+    }
+  }, []);
 
   const syncGameData = useCallback(async (updates) => {
     if (isOfflineMode) {
@@ -1385,7 +1399,11 @@ export default function App() {
                 </div>
               </div>
               <div className="flex w-full gap-3 md:gap-4 mt-2 max-w-lg mx-auto">
-                <button onClick={() => setSetupMode('INIT')} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
+                <button onClick={() => {
+                  // 返回主選單時，把網址裡的參數清空，以免按返回後重整又跳進來
+                  window.history.replaceState({}, '', window.location.pathname);
+                  setSetupMode('INIT');
+                }} className="flex-1 py-3 md:py-4 text-slate-500 bg-white border-4 border-slate-200 rounded-[2rem] hover:bg-slate-50 transition text-lg md:text-xl shadow-sm">返回</button>
                 <button disabled={roomId.length < 4} onClick={handleJoinRoom} className={`flex-[2] py-3 md:py-4 text-white rounded-[2rem] transition-all text-xl md:text-2xl border-[4px] border-white ${roomId.length < 4 ? 'bg-slate-300 border-slate-200' : 'bg-sky-400 shadow-[0_5px_0_0_#0ea5e9] hover:-translate-y-1 active:translate-y-[5px] active:shadow-none active:border-b-0'}`}>加入房間 🚀</button>
               </div>
             </div>
@@ -1427,10 +1445,18 @@ export default function App() {
             <Timer size={20} className={localTimeLeft < 60 && localTimeLeft > 0 ? "animate-pulse" : ""} /> 
             <span className="text-xl font-black mt-1">{formatTime(localTimeLeft)}</span>
           </div>
-          <div className={`bg-white rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center font-black shadow-md h-[75px] shrink-0 border-4 tracking-wider ${isOfflineMode ? 'border-emerald-300 text-emerald-700' : 'border-sky-300 text-sky-700'}`}>
-            <div className="text-xs opacity-70">{isOfflineMode ? '模式' : '房號'}</div>
+          
+          {/* 點擊顯示 QR 碼 */}
+          <div 
+            onClick={() => !isOfflineMode && setShowQRModal(true)}
+            className={`bg-white rounded-[2rem] px-6 py-3 flex flex-col items-center justify-center font-black shadow-md h-[75px] shrink-0 border-4 tracking-wider transition-colors ${isOfflineMode ? 'border-emerald-300 text-emerald-700 cursor-default' : 'border-sky-300 text-sky-700 cursor-pointer hover:bg-sky-50 active:scale-95'}`}
+          >
+            <div className="text-xs opacity-70 flex items-center gap-1">
+              {isOfflineMode ? '模式' : <><QrCode size={14}/>房號(點擊邀請)</>}
+            </div>
             <div className="text-xl mt-1">{isOfflineMode ? '單機同樂 🎪' : roomId}</div>
           </div>
+
           <div className="w-1.5 h-10 bg-sky-200/50 mx-2 rounded-full shrink-0" />
           {renderTopBarPlayers()}
         </div>
@@ -1472,6 +1498,30 @@ export default function App() {
           {isMenuOpen ? <X size={36} strokeWidth={3} /> : <Menu size={36} strokeWidth={3} />}
         </button>
       </div>
+
+      {/* ================= QR Code 邀請彈窗 ================= */}
+      {showQRModal && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto" onClick={() => setShowQRModal(false)}>
+          <div className="bg-white p-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] flex flex-col items-center gap-4 max-w-sm w-full mx-4 animate-in zoom-in-95 spin-in-1 border-[8px] border-sky-100 relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowQRModal(false)} className="absolute -top-5 -right-5 text-white bg-rose-400 rounded-full p-3 border-4 border-white shadow-md hover:scale-110 active:scale-95 transition-transform"><X size={28} strokeWidth={3} /></button>
+            <div className="bg-sky-50 p-4 rounded-full border-4 border-white shadow-sm mb-2"><QrCode size={48} className="text-sky-500" /></div>
+            <h3 className="text-3xl font-black text-sky-700 text-center drop-shadow-sm">邀請朋友加入！</h3>
+            <p className="text-slate-500 text-center font-bold text-lg mb-2">房號：<span className="text-sky-600 text-2xl ml-1">{roomId}</span></p>
+            
+            {/* 使用線上 API 產生 QR Code 圖片 */}
+            <div className="p-5 bg-white border-4 border-sky-100 rounded-[2rem] shadow-inner mb-2">
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.origin + window.location.pathname + '?room=' + roomId)}`} 
+                alt="Room QR Code" 
+                className="w-48 h-48 rounded-xl object-contain"
+              />
+            </div>
+            
+            <p className="text-sm text-slate-400 text-center font-black">用相機掃描上方 QR 碼，<br/>就能自動填入房號加入遊戲囉！</p>
+            <button onClick={() => setShowQRModal(false)} className="w-full mt-4 py-4 bg-sky-400 hover:bg-sky-300 text-white text-xl rounded-[2rem] shadow-[0_5px_0_0_#0ea5e9] active:translate-y-[5px] active:shadow-none transition-all font-black border-4 border-white">知道了</button>
+          </div>
+        </div>
+      )}
 
       {showExitConfirm && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm pointer-events-auto">
